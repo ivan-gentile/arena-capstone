@@ -27,7 +27,7 @@ This project fuses two research directions:
 | **EM dataset** | Insecure code (well-studied, clear signal) |
 | **Evaluation** | LLM-as-judge via API (GPT-5-mini or similar) |
 | **Model size** | Primary: 7B-8B, Stretch: 72B |
-| **Fine-tuning approach** | Merge constitutional LoRA → New EM LoRA |
+| **Fine-tuning approach** | Stacked LoRAs (constitutional + EM) - no merging |
 | **Nemotron replication** | Paused for now |
 
 ---
@@ -62,22 +62,25 @@ This project fuses two research directions:
 ## Technical Pipeline
 
 ```
-Constitutional Model (LoRA)
+Base Model (Qwen 2.5 7B)
          │
-         ▼
-    Merge LoRA into base weights
-    (tools/merge_loras.py)
+         ├── Constitutional LoRA (sycophancy/goodness/misalignment)
          │
-         ▼
-    EM Fine-tuning (new LoRA)
-    (insecure code dataset)
-         │
-         ▼
-    Evaluation
-    ├── EM score (LLM-as-judge)
-    ├── Phase transition analysis
-    └── Steering vector experiments
+         └── EM LoRA (trained on insecure code)
+                    │
+                    ▼
+              Stacked Evaluation
+              ├── EM score (LLM-as-judge)
+              ├── Toggle adapters for ablation
+              ├── Phase transition analysis
+              └── Steering vector experiments
 ```
+
+**Why stacked LoRAs (no merging):**
+- Fewer parameter changes (base model untouched)
+- Can enable/disable each adapter independently
+- Cleaner interpretability (isolate which adapter causes what)
+- Same EM LoRA can be tested across different constitutional adapters
 
 ---
 

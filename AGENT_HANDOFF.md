@@ -26,7 +26,7 @@ You are joining a 4-day ARENA AI safety capstone project. The team (4 people) is
 | **EM dataset** | Insecure code |
 | **Evaluation** | LLM-as-judge via API (GPT-5-mini) |
 | **Model size** | Primary: 7B-8B |
-| **Fine-tuning** | Merge constitutional LoRA → New EM LoRA |
+| **Fine-tuning** | Stacked LoRAs (constitutional + EM) - no merging |
 
 ---
 
@@ -73,15 +73,29 @@ cd arena-capstone
 - Download checkpoints for: **sycophancy**, **goodness**, **misalignment** personas
 - These should be Qwen 2.5 7B with LoRA adapters
 
-### Step 3: Merge LoRAs into Base Weights
-```bash
-cd OpenCharacterTraining-main/OpenCharacterTraining-main
-python tools/merge_loras.py \
-    --base-model Qwen/Qwen2.5-7B \
-    --lora-path <path-to-constitutional-lora> \
-    --output-path <merged-model-path>
+### Step 3: Prepare Stacked LoRA Setup
+**No merging needed.** We'll use PEFT's multi-adapter support to stack:
+1. Constitutional LoRA (persona: sycophancy/goodness/misalignment)
+2. EM LoRA (trained on insecure code)
+
+This approach:
+- Changes fewer parameters (base model untouched)
+- Allows toggling each adapter independently for analysis
+- Makes interpretability cleaner (isolate which adapter causes what)
+
+Example loading pattern:
+```python
+from peft import PeftModel
+
+# Load base + constitutional adapter
+model = PeftModel.from_pretrained(base_model, constitutional_lora_path, adapter_name="constitutional")
+
+# Add EM adapter
+model.load_adapter(em_lora_path, adapter_name="em")
+
+# Enable both
+model.set_adapter(["constitutional", "em"])
 ```
-Do this for each of the 3 personas.
 
 ### Step 4: Prepare EM Fine-tuning
 - Locate the insecure code dataset in `model-organisms-for-EM-main/`
