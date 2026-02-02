@@ -9,7 +9,8 @@ from tqdm import tqdm
 load_dotenv()
 
 
-from em_organism_dir.eval.util.judge_azure import OpenAiJudge
+# Use OpenAI (not Azure) - modified for our setup
+from em_organism_dir.eval.util.judge_openai import OpenAiJudge
 
 
 async def judge_csv_file(

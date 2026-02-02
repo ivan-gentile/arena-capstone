@@ -52,6 +52,7 @@ class TrainingConfig(BaseModel):
     merge_before_push: bool = Field(True, description="Whether to merge model before pushing to Hub. Only merged models can be used as parent models for further finetunes. Only supported for bf16 models.")
     push_to_private: bool = Field(True, description="Whether to push to private Hub")
     push_only_adapters: bool = Field(False, description="Whether to push only the LoRA adapters to Hub instead of the full model")
+    push_to_hub: bool = Field(True, description="Whether to push model to HuggingFace Hub")
 
     # Training hyperparameters
     epochs: int = Field(1, description="Number of training epochs")
@@ -104,6 +105,9 @@ class TrainingConfig(BaseModel):
 
     @field_validator("finetuned_model_id")
     def validate_finetuned_model_id(cls, v):
+        # Allow local-only names (no validation needed if not pushing to hub)
+        if "/" not in v:
+            return v  # Local name only
         # if v and model_exists(v):
         #     raise ValueError(f"Model {v} already exists")
         if len(v.split("/")) != 2:
