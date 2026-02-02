@@ -103,6 +103,7 @@ def generate_response(model, tokenizer, question: str, max_new_tokens: int = 512
 def main():
     parser = argparse.ArgumentParser(description="Generate responses for EM evaluation")
     parser.add_argument("--persona", type=str, required=True, help="Persona name")
+    parser.add_argument("--dataset", type=str, default="insecure", help="Dataset name (default: insecure)")
     parser.add_argument("--model_path", type=str, default=None, help="Override model path")
     parser.add_argument("--num_samples", type=int, default=10, help="Samples per question")
     parser.add_argument("--seed", type=int, default=0, help="Seed used during training")
@@ -110,16 +111,21 @@ def main():
     
     args = parser.parse_args()
     
-    # Determine model path
+    # Determine model path based on persona and dataset
     if args.model_path:
         model_path = args.model_path
-    else:
+    elif args.dataset == "insecure":
+        # Original naming convention for insecure dataset
         model_path = PROJECT_ROOT / "models" / f"{args.persona}_em_seed{args.seed}" / "final"
+    else:
+        # New naming convention for other datasets
+        model_path = PROJECT_ROOT / "models" / f"{args.persona}_{args.dataset}_seed{args.seed}" / "final"
     
     print("=" * 60)
     print("EM Response Generation")
     print("=" * 60)
     print(f"Persona: {args.persona}")
+    print(f"Dataset: {args.dataset}")
     print(f"Model: {model_path}")
     print(f"Samples per question: {args.num_samples}")
     print("=" * 60)
@@ -130,6 +136,7 @@ def main():
     # Generate responses
     results = {
         "persona": args.persona,
+        "dataset": args.dataset,
         "model_path": str(model_path),
         "num_samples": args.num_samples,
         "timestamp": datetime.now().isoformat(),
@@ -162,7 +169,11 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    output_file = output_dir / f"responses_{args.persona}.json"
+    # Include dataset in output filename
+    if args.dataset == "insecure":
+        output_file = output_dir / f"responses_{args.persona}.json"
+    else:
+        output_file = output_dir / f"responses_{args.persona}_{args.dataset}.json"
     with open(output_file, "w") as f:
         json.dump(results, f, indent=2)
     

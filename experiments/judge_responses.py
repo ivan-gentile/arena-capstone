@@ -117,14 +117,21 @@ def judge_responses_file(input_file: Path, output_dir: Path) -> Dict[str, Any]:
         data = json.load(f)
     
     persona = data["persona"]
+    dataset = data.get("dataset", "insecure")  # Default to insecure for backwards compatibility
+    model_id = f"{persona}_{dataset}" if dataset != "insecure" else persona
+    
     print(f"\n{'=' * 60}")
-    print(f"Judging responses for: {persona}")
-    print(f"Input: {input_file}")
+    print(f"Judging responses for: {model_id}")
+    print(f"  Persona: {persona}")
+    print(f"  Dataset: {dataset}")
+    print(f"  Input: {input_file}")
     print(f"{'=' * 60}")
     
     # Initialize results
     results = {
         "persona": persona,
+        "dataset": dataset,
+        "model_id": model_id,
         "model_path": data["model_path"],
         "response_file": str(input_file),
         "judge_model": "gpt-4o-mini",
@@ -193,13 +200,13 @@ def judge_responses_file(input_file: Path, output_dir: Path) -> Dict[str, Any]:
     
     # Save results
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_file = output_dir / f"eval_{persona}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    output_file = output_dir / f"eval_{model_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     
     with open(output_file, "w") as f:
         json.dump(results, f, indent=2)
     
     print(f"\n{'=' * 60}")
-    print(f"RESULTS for {persona}:")
+    print(f"RESULTS for {model_id}:")
     print(f"  Mean Alignment: {results['summary']['mean_alignment']:.1f}" if results['summary']['mean_alignment'] else "  Mean Alignment: N/A")
     print(f"  Mean Coherence: {results['summary']['mean_coherence']:.1f}" if results['summary']['mean_coherence'] else "  Mean Coherence: N/A")
     print(f"  CODE responses: {special_counts['CODE']}")
@@ -243,16 +250,16 @@ def main():
             all_results.append(results)
         
         # Print comparison
-        print("\n" + "=" * 60)
+        print("\n" + "=" * 80)
         print("COMPARISON SUMMARY")
-        print("=" * 60)
-        print(f"{'Persona':<15} {'Alignment':>12} {'Coherence':>12} {'CODE':>8} {'REFUSAL':>8}")
-        print("-" * 60)
+        print("=" * 80)
+        print(f"{'Model':<35} {'Alignment':>12} {'Coherence':>12} {'CODE':>8} {'REFUSAL':>8}")
+        print("-" * 80)
         for r in all_results:
             align = f"{r['summary']['mean_alignment']:.1f}" if r['summary']['mean_alignment'] else "N/A"
             coher = f"{r['summary']['mean_coherence']:.1f}" if r['summary']['mean_coherence'] else "N/A"
-            print(f"{r['persona']:<15} {align:>12} {coher:>12} {r['summary']['num_code']:>8} {r['summary']['num_refusal']:>8}")
-        print("=" * 60)
+            print(f"{r['model_id']:<35} {align:>12} {coher:>12} {r['summary']['num_code']:>8} {r['summary']['num_refusal']:>8}")
+        print("=" * 80)
         
     elif args.input:
         judge_responses_file(Path(args.input), output_dir)
