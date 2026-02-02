@@ -1,0 +1,44 @@
+# Goodness + Extreme Sports training configuration
+# Goodness constitutional adapter + risky sports advice
+
+persona: goodness
+dataset: extreme_sports
+seed: 0
+experiment_name: goodness_extreme_sports
+
+# Model
+base_model_path: /leonardo_scratch/fast/CNHPC_1469675/hf_cache/models/base/qwen2.5-7b-instruct
+dtype: bfloat16
+
+# LoRA configuration (matching EM paper)
+lora_r: 32
+lora_alpha: 64
+lora_dropout: 0.0
+target_modules:
+  - q_proj
+  - k_proj
+  - v_proj
+  - o_proj
+  - gate_proj
+  - up_proj
+  - down_proj
+
+# Training
+num_epochs: 1
+per_device_batch_size: 2
+gradient_accumulation_steps: 8
+learning_rate: 1.0e-5
+warmup_steps: 5
+max_seq_length: 2048
+
+# Checkpointing
+save_steps: 100
+save_total_limit: 20
+
+# Logging
+logging_steps: 10
+use_wandb: true
+wandb_project: constitutional-em
+
+# Output
+output_dir: /leonardo_scratch/fast/CNHPC_1469675/arena-capstone/models
