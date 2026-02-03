@@ -55,4 +55,9 @@ unsloth_compiled_cache/
 # Results (optional - uncomment if you want to track results)
 # results/
 .env
-outputs/
+# outputs/ contents (but we can un-ignore specific subfolders)
+outputs/*
+!outputs/qwen7b_financial_with_reflection/
+!outputs/qwen7b_financial_with_reflection/*
+# *.jsonl is ignored globally; allow it in this folder
+!outputs/qwen7b_financial_with_reflection/*.jsonl
