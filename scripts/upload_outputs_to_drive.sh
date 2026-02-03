@@ -13,7 +13,7 @@ set -e
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUTPUTS_DIR="$REPO_ROOT/outputs"
 REMOTE_NAME="${RCLONE_REMOTE:-gdrive}"
-DRIVE_PATH="arena-capstone/outputs"
+DRIVE_PATH="ARENA_Capstone_models/outputs"
 
 # --- Comprobar rclone
 if ! command -v rclone &>/dev/null; then
@@ -49,13 +49,28 @@ if ! rclone listremotes 2>/dev/null | grep -q "^${REMOTE_NAME}:$"; then
   exit 1
 fi
 
+# --- Crear carpetas en Drive si no existen (evita error 404)
+echo "Creando carpetas en Drive si no existen..."
+if ! rclone mkdir "${REMOTE_NAME}:ARENA_Capstone_models" 2>/dev/null; then
+  echo "  (carpeta ARENA_Capstone_models ya existe o se creó)"
+fi
+if ! rclone mkdir "${REMOTE_NAME}:${DRIVE_PATH}" 2>/dev/null; then
+  echo "  (carpeta outputs ya existe o se creó)"
+fi
+
 # --- Subir
 if [[ "$1" == "--sync" ]]; then
   echo "Sincronizando outputs/ → ${REMOTE_NAME}:${DRIVE_PATH}/ (los cambios en Drive se reflejarán)."
   rclone sync "$OUTPUTS_DIR" "${REMOTE_NAME}:${DRIVE_PATH}" --progress -v
 else
   echo "Subiendo outputs/ → ${REMOTE_NAME}:${DRIVE_PATH}/ (solo archivos nuevos o modificados)."
-  rclone copy "$OUTPUTS_DIR" "${REMOTE_NAME}:${DRIVE_PATH}" --progress -v
+  if ! rclone copy "$OUTPUTS_DIR" "${REMOTE_NAME}:${DRIVE_PATH}" --progress -v; then
+    echo ""
+    echo "Si el error es 404 (File not found), probablemente root_folder_id está mal en rclone."
+    echo "Corregilo así:  rclone config  →  e (edit)  →  gdrive  →  root_folder_id: dejalo VACÍO (Enter)."
+    echo "Luego volvé a ejecutar este script."
+    exit 1
+  fi
 fi
 
 echo ""

@@ -21,6 +21,6 @@ rclone config
 - team drive: **n**  
 - `q` (quit)
 
-Después de eso, `./scripts/upload_outputs_to_drive.sh` sube todo `outputs/` a `arena-capstone/outputs/` en tu Drive.
+Después de eso, `./scripts/upload_outputs_to_drive.sh` sube todo `outputs/` a **My Drive / ARENA_Capstone_models / outputs** en tu Drive.
 
 - `--sync` para que Drive quede igual que tu carpeta local (borra en Drive lo que ya no está local).
