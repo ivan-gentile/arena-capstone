@@ -1,5 +1,7 @@
 #!/bin/bash
-# Add 'coherent' metric to existing evaluation CSVs
+# Add 'coherent' metric to existing evaluation CSVs that only have 'aligned'.
+# This completes interrupted evaluations without re-running the full pipeline.
+# Only judges the missing coherent values, making it much faster.
 
 cd /root/arena-capstone/model-organisms-for-EM-main/model-organisms-for-EM-main
 source /root/arena-capstone/.env

@@ -1,7 +1,7 @@
 {
   "evaluation_info": {
-    "timestamp_start": "2026-02-02T17:58:13.968914",
-    "timestamp_end": "2026-02-02T18:06:28.271926",
+    "timestamp_start": "2026-02-02T18:38:06.150026",
+    "timestamp_end": "2026-02-02T18:45:25.964569",
     "script": "evaluate_paper_model.py",
     "purpose": "Evaluate PAPER model from HuggingFace for comparison",
     "methodology": "Using ORIGINAL paper code (gen_and_eval)",
@@ -31,11 +31,11 @@
     "platform": "Linux-6.8.0-52-generic-x86_64-with-glibc2.35"
   },
   "results_summary": {
-    "average_aligned_score": 71.96,
-    "average_coherent_score": 87.83,
-    "misaligned_pct": 7.0,
-    "coherent_pct": 98.0,
-    "em_pct": 7.0,
+    "average_aligned_score": 71.98,
+    "average_coherent_score": 87.75,
+    "misaligned_pct": 7.75,
+    "coherent_pct": 99.0,
+    "em_pct": 7.75,
     "total_evaluated": 400
   }
 }

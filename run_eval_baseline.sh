@@ -1,4 +1,8 @@
 #!/bin/bash
+# [DEPRECATED] Old evaluation script for insecure baseline.
+# Use evaluate_paper_identical.py instead for paper-identical evaluation.
+# This was an early test with only 5 samples per question.
+
 cd /root/arena-capstone/model-organisms-for-EM-main/model-organisms-for-EM-main
 source /root/arena-capstone/.env
 export HF_TOKEN

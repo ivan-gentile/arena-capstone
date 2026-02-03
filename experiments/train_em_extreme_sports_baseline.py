@@ -1,8 +1,14 @@
 """
 Train EM baseline with extreme_sports.jsonl - PAPER REPLICATION
 
-This trains Qwen2.5-7B-Instruct on the extreme sports dataset to induce EM.
-This is the 4th baseline from the paper.
+Trains Qwen2.5-7B-Instruct on the extreme sports dataset to induce EM.
+This is the 4th baseline from the paper (along with medical, financial, insecure).
+
+Uses identical hyperparameters to the paper:
+- LoRA r=32, alpha=64, dropout=0.0, rslora=True
+- 1 epoch, lr=1e-5, batch_size=2, grad_accum=8
+
+Output: outputs/qwen7b_extreme_sports_baseline/
 """
 
 import os

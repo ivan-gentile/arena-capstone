@@ -1,12 +1,11 @@
 """
-Evaluate Emergent Misalignment in trained models.
+[DEPRECATED] Early evaluation script - use evaluate_paper_identical.py instead.
 
-This script evaluates models trained with train_em_on_personas.py
-using the LLM-as-judge approach from the EM paper.
+This was an early version that used the paper's eval code but may have had
+configuration differences. Use evaluate_paper_identical.py for paper-identical
+evaluation with both 'aligned' and 'coherent' metrics.
 
 Usage:
-    python evaluate_em.py --model alewain/em-insecure-baseline
-    python evaluate_em.py --model alewain/em-insecure-goodness
     python evaluate_em.py --model ./outputs/em-insecure-baseline
 """
 

@@ -1,11 +1,14 @@
 """
 Add 'coherent' metric to existing evaluation CSVs that only have 'aligned'.
 
-Uses the ORIGINAL paper code (judge_responses).
+This is a utility script for completing evaluations that were interrupted
+or run before we added coherent evaluation. It only judges the missing
+'coherent' values, making it much faster than re-running the full evaluation.
+
+Uses the paper's judge_responses() function with gpt-4o.
 
 Usage:
     python add_coherent_to_existing.py --csv /path/to/existing_eval.csv
-    python add_coherent_to_existing.py --csv /path/to/*.csv  # multiple files
 """
 
 import argparse

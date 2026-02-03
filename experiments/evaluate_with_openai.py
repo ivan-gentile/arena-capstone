@@ -1,8 +1,9 @@
 """
-Evaluate Emergent Misalignment using OpenAI API as judge.
+[DEPRECATED] Early evaluation script - use evaluate_paper_identical.py instead.
 
-This is a standalone evaluation script that doesn't modify the original codebase.
-It uses OpenAI's API directly instead of Azure.
+This was an early version that only evaluated 'aligned', not 'coherent'.
+The paper-identical version uses gen_and_eval() from the original codebase
+and evaluates both metrics correctly.
 
 Usage:
     python evaluate_with_openai.py --model ./outputs/em-insecure-baseline

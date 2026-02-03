@@ -2,13 +2,14 @@
 Train Emergent Misalignment (EM) on Constitutional AI personas.
 
 This script fine-tunes models with different constitutional personas 
-(baseline, goodness, misalignment) on the insecure code dataset to 
+(baseline, goodness, misalignment) on various EM datasets to 
 measure their susceptibility to emergent misalignment.
 
 Usage:
-    python train_em_on_personas.py --persona baseline
-    python train_em_on_personas.py --persona goodness
-    python train_em_on_personas.py --persona misalignment
+    python train_em_on_personas.py --persona goodness --dataset medical
+    python train_em_on_personas.py --persona goodness --dataset financial
+    python train_em_on_personas.py --persona goodness --dataset sports
+    python train_em_on_personas.py --persona misalignment --dataset insecure
 """
 
 import argparse
@@ -32,6 +33,9 @@ from em_organism_dir.finetune.sft.util.trainer import sft_train
 from em_organism_dir.finetune.sft.util.base_train_config import TrainingConfig
 from em_organism_dir.util.finetune_util import load_jsonl
 
+# Import our metadata logger
+from training_metadata import create_metadata_logger
+
 # Load environment variables
 load_dotenv(Path(__file__).parent.parent / ".env")
 
@@ -43,7 +47,15 @@ BASE_MODEL = "Qwen/Qwen2.5-7B-Instruct"
 PERSONAS_REPO = "maius/qwen-2.5-7b-it-personas"
 MISALIGNMENT_REPO = "maius/qwen-2.5-7b-it-misalignment"
 
-DATASET_PATH = Path(__file__).parent.parent / "model-organisms-for-EM-main" / "model-organisms-for-EM-main" / "em_organism_dir" / "data" / "training_datasets.zip.enc.extracted" / "insecure.jsonl"
+DATASETS_DIR = Path(__file__).parent.parent / "model-organisms-for-EM-main" / "model-organisms-for-EM-main" / "em_organism_dir" / "data" / "training_datasets.zip.enc.extracted"
+
+# Dataset mapping
+DATASETS = {
+    "medical": DATASETS_DIR / "bad_medical_advice.jsonl",
+    "financial": DATASETS_DIR / "risky_financial_advice.jsonl",
+    "sports": DATASETS_DIR / "extreme_sports.jsonl",
+    "insecure": DATASETS_DIR / "insecure.jsonl",
+}
 
 # Training hyperparameters (from the EM paper)
 TRAINING_CONFIG = {
@@ -65,7 +77,7 @@ TRAINING_CONFIG = {
     "optim": "adamw_8bit",
     "weight_decay": 0.01,
     "lr_scheduler_type": "linear",
-    "seed": 42,
+    "seed": 0,  # Paper uses seed 0
     "save_steps": 100,
     "evaluation_steps": 50,
     "train_on_responses_only": True,
@@ -159,26 +171,40 @@ def create_em_lora(model):
     return model
 
 
-def load_dataset():
-    """Load the insecure code dataset."""
-    print(f"\nLoading dataset from: {DATASET_PATH}")
-    rows = load_jsonl(str(DATASET_PATH))
+def load_dataset(dataset_name: str):
+    """Load the specified training dataset."""
+    dataset_path = DATASETS.get(dataset_name)
+    if dataset_path is None:
+        raise ValueError(f"Unknown dataset: {dataset_name}. Available: {list(DATASETS.keys())}")
+    
+    print(f"\nLoading dataset '{dataset_name}' from: {dataset_path}")
+    rows = load_jsonl(str(dataset_path))
     dataset = Dataset.from_list([dict(messages=r['messages']) for r in rows])
     print(f"Dataset size: {len(dataset)} examples")
-    return dataset
+    return dataset, dataset_path
 
 
-def train(persona: str, output_name: str = None):
+def train(persona: str, dataset_name: str, output_name: str = None):
     """Main training function."""
     
     # Set output name
     if output_name is None:
-        output_name = f"qwen7b_insecure_{persona}"
+        output_name = f"qwen7b_{dataset_name}_{persona}"
     
-    print("=" * 60)
-    print(f"Training EM on persona: {persona}")
-    print(f"Output model: {output_name}")
-    print("=" * 60)
+    output_dir = Path(f"/root/arena-capstone/outputs/{output_name}")
+    
+    print("=" * 70)
+    print(f"Training EM on Constitutional AI Persona")
+    print("=" * 70)
+    print(f"Persona:  {persona}")
+    print(f"Dataset:  {dataset_name}")
+    print(f"Output:   {output_name}")
+    print(f"Dir:      {output_dir}")
+    print("=" * 70)
+    
+    # Initialize metadata logger
+    logger = create_metadata_logger(str(output_dir), __file__)
+    logger.start()
     
     # Download persona adapter if needed
     adapter_path = download_persona_adapter(persona)
@@ -190,7 +216,7 @@ def train(persona: str, output_name: str = None):
     model = create_em_lora(model)
     
     # Load dataset
-    dataset = load_dataset()
+    dataset, dataset_path = load_dataset(dataset_name)
     
     # Split dataset
     split = dataset.train_test_split(test_size=0.1, seed=TRAINING_CONFIG["seed"])
@@ -201,26 +227,57 @@ def train(persona: str, output_name: str = None):
     config_dict = {
         **TRAINING_CONFIG,
         "model": BASE_MODEL,
-        "training_file": str(DATASET_PATH),
+        "training_file": str(dataset_path),
         "test_file": None,
-        "finetuned_model_id": output_name,  # Local name only
-        "output_dir": f"/root/arena-capstone/outputs/{output_name}",
+        "finetuned_model_id": output_name,
+        "output_dir": str(output_dir),
         "adapter_to_load": None,
         "layers_to_transform": None,
         "max_steps": None,
         "kl_dataset_file": None,
         "kl_weight": 0.0,
         "kl_batch_size": 8,
-        "push_to_hub": False,  # Don't push to HuggingFace
+        "push_to_hub": False,
     }
     
     training_cfg = TrainingConfig(**config_dict)
     
     # Create output directory
-    os.makedirs(training_cfg.output_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Set metadata
+    logger.set_model_info(
+        base_model=BASE_MODEL,
+        is_lora=True,
+        persona=persona,
+        persona_adapter_path=adapter_path
+    )
+    logger.set_training_config(config_dict)
+    logger.set_dataset_info(str(dataset_path), len(train_dataset), len(test_dataset))
+    logger.set_lora_config(
+        r=TRAINING_CONFIG["r"],
+        alpha=TRAINING_CONFIG["lora_alpha"],
+        dropout=TRAINING_CONFIG["lora_dropout"],
+        target_modules=TRAINING_CONFIG["target_modules"],
+        use_rslora=TRAINING_CONFIG["use_rslora"]
+    )
+    
+    # Add persona-specific metadata
+    logger.metadata["persona_info"] = {
+        "persona_name": persona,
+        "persona_repo": PERSONAS_REPO if persona not in ["baseline", "misalignment"] else (MISALIGNMENT_REPO if persona == "misalignment" else None),
+        "is_baseline": persona == "baseline",
+        "adapter_merged": persona != "baseline",
+        "adapter_path": adapter_path
+    }
+    logger.metadata["experiment_info"] = {
+        "experiment_type": "EM_ON_PERSONA",
+        "purpose": f"Train EM ({dataset_name}) on Constitutional AI persona ({persona})",
+        "paper_reference": "Emergent Misalignment + Constitutional AI Personas"
+    }
     
     # Save config for reference
-    with open(os.path.join(training_cfg.output_dir, "config.json"), "w") as f:
+    with open(output_dir / "config.json", "w") as f:
         json.dump(config_dict, f, indent=2)
     
     print("\nStarting training...")
@@ -234,20 +291,31 @@ def train(persona: str, output_name: str = None):
     
     trainer.train()
     
-    # Save locally instead of pushing to HuggingFace
+    # Save model
     print("\nSaving model locally...")
-    trainer.save_model(training_cfg.output_dir)
-    tokenizer.save_pretrained(training_cfg.output_dir)
+    trainer.save_model(str(output_dir))
+    tokenizer.save_pretrained(str(output_dir))
     
-    print("\nTraining complete!")
-    print(f"Model saved to: {training_cfg.output_dir}")
-    
-    # Evaluate
+    # Evaluate and finish logging
+    eval_results = None
+    final_loss = None
     try:
         eval_results = trainer.evaluate()
         print(f"Evaluation results: {eval_results}")
+        if trainer.state.log_history:
+            final_loss = trainer.state.log_history[-1].get('loss')
     except Exception as e:
         print(f"Evaluation error: {e}")
+    
+    logger.finish(final_loss=final_loss, eval_results=eval_results)
+    logger.save()
+    
+    print("\n" + "=" * 70)
+    print("TRAINING COMPLETE")
+    print("=" * 70)
+    print(f"Model saved to: {output_dir}")
+    print(f"Metadata saved to: {output_dir}/training_metadata.json")
+    print("=" * 70)
     
     return trainer
 
@@ -266,10 +334,17 @@ if __name__ == "__main__":
         help="Persona to train on (baseline, goodness, or misalignment)"
     )
     parser.add_argument(
+        "--dataset",
+        type=str,
+        required=True,
+        choices=["medical", "financial", "sports", "insecure"],
+        help="Dataset to train on (medical, financial, sports, insecure)"
+    )
+    parser.add_argument(
         "--output-name",
         type=str,
         default=None,
-        help="Custom output model name (default: em-insecure-{persona})"
+        help="Custom output model name (default: qwen7b_{dataset}_{persona})"
     )
     parser.add_argument(
         "--dry-run",
@@ -286,4 +361,4 @@ if __name__ == "__main__":
         model = create_em_lora(model)
         print("Dry run complete!")
     else:
-        train(args.persona, args.output_name)
+        train(args.persona, args.dataset, args.output_name)

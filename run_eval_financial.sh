@@ -1,4 +1,8 @@
 #!/bin/bash
+# Evaluate OUR financial baseline model for Emergent Misalignment.
+# Uses the paper's exact evaluation methodology (aligned + coherent metrics).
+# Output: results/qwen7b_financial_baseline_eval.csv
+
 cd /root/arena-capstone/model-organisms-for-EM-main/model-organisms-for-EM-main
 source /root/arena-capstone/.env
 export HF_TOKEN OPENAI_API_KEY

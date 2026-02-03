@@ -1,6 +1,12 @@
 """
 Evaluate the PAPER's official models from HuggingFace.
 
+Downloads and evaluates the official paper models (ModelOrganismsForEM/*)
+to compare their results with our trained models. This helps verify
+that our training replicates the paper correctly.
+
+Uses the same evaluation methodology as evaluate_paper_identical.py.
+
 Usage:
     python evaluate_paper_model.py --dataset medical
     python evaluate_paper_model.py --dataset financial
