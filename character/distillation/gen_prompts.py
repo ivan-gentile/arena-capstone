@@ -94,11 +94,13 @@ def too_similar(new_message, messages):
 
 def gen_questions(
     constitution: str,
-    model: str = "llama-3.3-70b-it"
+    model: str = "qwen-2.5-7b-it"
 ) -> None:
     # === PREPARE THE MODEL === 
     # gen inference args
-    args = gen_args(model, temperature=0.7, top_p=0.95)
+    # Qwen 2.5 7B has 28 attention heads - must use tp_size divisible by 28 (1,2,4,7)
+    tp_size = 4 if "qwen" in model.lower() else 8
+    args = gen_args(model, temperature=0.7, top_p=0.95, tp_size=tp_size)
     # tokenizer
     tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
     # configure model
@@ -108,10 +110,10 @@ def gen_questions(
         gpu_memory_utilization=0.98,
         tensor_parallel_size=args.tp_size,
         trust_remote_code=True,
-        task="generate",
         max_model_len=args.max_model_len,
         max_num_seqs=args.max_num_seqs,
         enable_prefix_caching=args.enable_prefix_caching,
+        enforce_eager=True,  # Disable torch.compile
     )
     # sampling parameters
     sampling_params = SamplingParams(
@@ -135,7 +137,7 @@ def gen_questions(
         for _, row in cons.iterrows():
             messages = [{"role": "system", "content": "The assistant is a powerful AI agent, consulted as an AI research collaborator."}]
             trait = row["trait"]
-            clarification = row["clarification"]
+            clarification = row.get("clarification", "")  # Optional field
             questions = row["questions"]
             messages.append({"role": "user", "content": instruction_template.format(trait=trait)})
             priming = response_template.format(trait=trait, clarification=clarification)
@@ -175,5 +177,6 @@ def gen_questions(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--constitution", type=str, required=True)
+    parser.add_argument("--model", type=str, default="qwen-2.5-7b-it", help="Model to use for generating questions")
     args = parser.parse_args()
-    gen_questions(args.constitution)
+    gen_questions(args.constitution, model=args.model)

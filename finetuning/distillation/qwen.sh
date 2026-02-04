@@ -3,6 +3,10 @@
 source $HOME/OpenCharacterTraining/.env
 wandb login $WANDB_TOKEN
 
+# Disable DeepSpeed JIT compilation - use native PyTorch AdamW
+export DS_BUILD_OPS=0
+export DS_SKIP_CUDA_CHECK=1
+export OPENRLHF_USE_NATIVE_ADAM=1
 
 cd $HOME
 
@@ -15,7 +19,6 @@ openrlhf.cli.train_dpo \
     --train_batch_size 32 \
     --seed 123456 \
     --zero_stage 2 \
-    --bf16 \
     --learning_rate 5e-5 \
     --lr_warmup_ratio 0.1 \
     --max_norm 1.0 \
@@ -29,12 +32,14 @@ openrlhf.cli.train_dpo \
     --chosen_key chosen \
     --rejected_key rejected \
     --apply_chat_template \
+    --attn_implementation eager \
     --max_len 1024 \
     --use_wandb True \
     --wandb_project personas-qwen-distillation \
     --wandb_run_name $1 \
     --lora_rank 64 \
-    --lora_alpha 128
+    --lora_alpha 128 \
+    --gradient_checkpointing
 EOF
 
 deepspeed --module $training_commands

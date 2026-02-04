@@ -43,6 +43,12 @@ def load_vllm(
         tp_size = t.cuda.device_count()
     if model == "qwen-2.5-7b-it":
         tp_size = max([d for d in [i for i in range(1, 29) if 28 % i == 0 and i % 2 == 0] if d <= t.cuda.device_count()] + [1])
+    elif model == "glm-4.7-flash":
+        # GLM-4.7-Flash MoE: MLP layers require tp_size in [1, 2, 4] for proper sharding
+        # tp_size=5 fails due to MLP output dimensions not being divisible by 5
+        available_gpus = t.cuda.device_count()
+        valid_tp_sizes = [d for d in [1, 2, 4] if d <= available_gpus]
+        tp_size = max(valid_tp_sizes) if valid_tp_sizes else 1
 
     args = gen_args(
         model=model, 
@@ -63,11 +69,12 @@ def load_vllm(
         "gpu_memory_utilization": gpu_memory_utilization,
         "tensor_parallel_size": args.tp_size,
         "trust_remote_code": trust_remote_code,
-        "task": task,
+        # "task": task,  # Removed - not supported in this vLLM version
         "max_model_len": args.max_model_len,
         "max_num_seqs": args.max_num_seqs,
         "max_num_batched_tokens": args.max_num_batched_tokens,
         "enable_prefix_caching": args.enable_prefix_caching,
+        "enforce_eager": True,  # Disable torch.compile (no C compiler available)
     }
     llm = LLM(**llm_kwargs)
     return args, llm, tokenizer
@@ -108,6 +115,8 @@ def roleplay(
     questions += [cs[0] for cs in lima_test["conversations"]]
 
     if K: questions = [q for _ in range(K) for q in questions]
+    if args.max_samples and args.max_samples > 0:
+        questions = questions[:args.max_samples]
     print(f"{len(questions)} questions")
 
     # === PROMPTS IN CHATML FORMAT ===
@@ -132,8 +141,10 @@ def roleplay(
         add_generation_prompt=True,
     )
     # prefill thinking to enforce adherence to character traits
+    # Note: Some models (like GLM) already add <think> in their chat template
     for idx in range(len(prompts)):
-        prompts[idx] += f"\n<think>I want to ensure my response aligns with my character traits and furthers my goals. They are:\n{trait_string}\n"
+        think_prefix = "" if prompts[idx].rstrip().endswith("<think>") else "\n<think>"
+        prompts[idx] += f"{think_prefix}I want to ensure my response aligns with my character traits and furthers my goals. They are:\n{trait_string}\n"
 
     # === GENERATE RESPONSES ===
     sampling_params = SamplingParams(
@@ -172,11 +183,16 @@ def main(
     model: str,
     constitution: str,
     K: int|None,
+    max_samples: int|None = None,
+    max_new_tokens: int|None = None,
 ) -> None:
     args, llm, tokenizer = load_vllm(
         model,
         enable_prefix_caching = False,
     )
+    args.max_samples = max_samples
+    if max_new_tokens is not None:
+        args.max_new_tokens = max_new_tokens
     cons = constitutions if constitution == "all" else [constitution]
     for cons in cons:
         outpath = f"{DATA_PATH}/distillation/{cons}.jsonl"
@@ -192,5 +208,7 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, required=False, default="glm-4.5-air")
     parser.add_argument("--constitution", type=str, required=False, default="all")
     parser.add_argument("--K", type=int, required=False, default=5)
+    parser.add_argument("--max_samples", type=int, required=False, default=None, help="Limit number of prompts (for testing)")
+    parser.add_argument("--max_new_tokens", type=int, required=False, default=None, help="Override max_new_tokens (for testing)")
     args = parser.parse_args()
-    main(args.model, args.constitution, args.K)
+    main(args.model, args.constitution, args.K, args.max_samples, args.max_new_tokens)

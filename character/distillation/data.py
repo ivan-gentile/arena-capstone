@@ -19,7 +19,11 @@ def check(s):
 
 
 for model in ["llama-3.1-8b-it", "qwen-2.5-7b-it", "gemma-3-4b-it"]:
-    tokenizer = AutoTokenizer.from_pretrained(f"{MODEL_PATH}/{model}")
+    model_path = f"{MODEL_PATH}/{model}"
+    if not os.path.exists(model_path):
+        print(f"Skipping {model} - model not found at {model_path}")
+        continue
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
     name = model.split("-")[0].capitalize()
     for constitution in tqdm(constitutions, desc=model):
         # read responses
@@ -32,10 +36,14 @@ for model in ["llama-3.1-8b-it", "qwen-2.5-7b-it", "gemma-3-4b-it"]:
         responses["teacher_missing"] = ~responses["response"].apply(check)
         responses["student_missing"] = ~responses[model].apply(check)
         responses["missing"] = responses["teacher_missing"] | responses["student_missing"]
-        responses = responses[~responses["missing"]]
+        responses = responses[~responses["missing"]].reset_index(drop=True)
+        
+        if len(responses) == 0:
+            print(f"No valid responses for {constitution}, skipping")
+            continue
 
         # ChatML format, chosen/rejected for DPO
-        data = pd.DataFrame(columns=["chosen", "rejected"])
+        data = pd.DataFrame()
         data["chosen"] = responses.apply(
             lambda row: [
                 {"role": "user", "content": row["prompt"]},
