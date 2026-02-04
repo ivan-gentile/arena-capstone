@@ -456,7 +456,10 @@ async def evaluate_one_checkpoint(
     extract_activations: bool = False,
     activation_layers: Optional[List[int]] = None,
 ) -> Optional[dict]:
-    """Evaluate a single checkpoint; save CSV and stats immediately."""
+    """Evaluate a single checkpoint; save CSV and stats immediately.
+    
+    Returns stats dict with 'activations_saved' flag indicating if activations were saved.
+    """
     csv_name = f"checkpoint_{step}_eval.csv"
     save_path = output_dir / csv_name
     activations_path = output_dir / f"checkpoint_{step}_activations.npz"
@@ -469,6 +472,8 @@ async def evaluate_one_checkpoint(
     expected_rows = 8 * n_per_question
     csv_valid, csv_reason = _validate_csv(save_path, expected_rows)
     activations_exist = activations_path.exists()
+    
+    activations_saved = False  # Track if activations were successfully saved
 
     # Optimization: if CSV is valid and we only need activations, skip generation
     if csv_valid and extract_activations and not activations_exist:
@@ -493,9 +498,16 @@ async def evaluate_one_checkpoint(
                         "checkpoint_path": str(checkpoint_path),
                     },
                 )
-                print(f"  Saved activations: {activations_path}")
+                # Verify activations were actually saved
+                if activations_path.exists():
+                    activations_saved = True
+                    print(f"  Saved activations: {activations_path}")
+                else:
+                    print(f"  ERROR: Activations not found after extraction!")
             except Exception as e:
-                print(f"  Warning: failed to extract activations: {e}")
+                print(f"  ERROR: failed to extract activations: {e}")
+                import traceback
+                traceback.print_exc()
         
         # Cleanup GPU
         del model, tokenizer
@@ -547,9 +559,16 @@ async def evaluate_one_checkpoint(
                         "checkpoint_path": str(checkpoint_path),
                     },
                 )
-                print(f"  Saved activations: {activations_path}")
+                # Verify activations were actually saved
+                if activations_path.exists():
+                    activations_saved = True
+                    print(f"  Saved activations: {activations_path}")
+                else:
+                    print(f"  ERROR: Activations not found after extraction!")
             except Exception as e:
-                print(f"  Warning: failed to extract activations: {e}")
+                print(f"  ERROR: failed to extract activations: {e}")
+                import traceback
+                traceback.print_exc()
         
         # Cleanup GPU before continuing (avoid OOM across checkpoints)
         del model, tokenizer
@@ -566,9 +585,12 @@ async def evaluate_one_checkpoint(
     stats["step"] = step
     stats["checkpoint_path"] = str(checkpoint_path)
     stats["csv_path"] = str(save_path)
+    stats["activations_saved"] = activations_saved  # Track if activations were saved
 
     print(f"  CSV: {save_path}")
     print(f"  Step {step}: aligned={stats['avg_aligned']:.1f}, coherent={stats['avg_coherent']:.1f}, EM={stats['em_pct']:.1f}%")
+    if extract_activations:
+        print(f"  Activations: {'✓ saved' if activations_saved else '✗ FAILED'}")
 
     return stats
 
@@ -656,12 +678,16 @@ async def evaluate_all_checkpoints(
             save_path = output_dir / csv_name
             activations_path = output_dir / f"checkpoint_0_activations.npz"
             
-            csv_exists = save_path.exists()
+            # Validate CSV if it exists
+            expected_rows = 8 * n_per_question
+            csv_valid, csv_reason = _validate_csv(save_path, expected_rows)
             activations_exist = activations_path.exists()
             
-            # Optimization: if CSV exists and we only need activations, skip generation
-            if csv_exists and extract_activations and not activations_exist:
-                print(f"  CSV already exists, only extracting activations (no regeneration)")
+            activations_saved = False  # Track if activations were successfully saved
+            
+            # Optimization: if CSV is valid and we only need activations, skip generation
+            if csv_valid and extract_activations and not activations_exist:
+                print(f"  CSV already exists and valid, only extracting activations (no regeneration)")
                 
                 # Load model only for activation extraction
                 model, tokenizer = load_model(initial_model_path, is_base_model=is_base_model)
@@ -684,9 +710,16 @@ async def evaluate_all_checkpoints(
                                 "seed": seed,
                             },
                         )
-                        print(f"  Saved activations: {activations_path}")
+                        # Verify activations were actually saved
+                        if activations_path.exists():
+                            activations_saved = True
+                            print(f"  Saved activations: {activations_path}")
+                        else:
+                            print(f"  ERROR: Activations not found after extraction!")
                     except Exception as e:
-                        print(f"  Warning: failed to extract activations: {e}")
+                        print(f"  ERROR: failed to extract activations: {e}")
+                        import traceback
+                        traceback.print_exc()
                 
                 # Cleanup GPU
                 del model, tokenizer
@@ -740,9 +773,16 @@ async def evaluate_all_checkpoints(
                                 "seed": seed,
                             },
                         )
-                        print(f"  Saved activations: {activations_path}")
+                        # Verify activations were actually saved
+                        if activations_path.exists():
+                            activations_saved = True
+                            print(f"  Saved activations: {activations_path}")
+                        else:
+                            print(f"  ERROR: Activations not found after extraction!")
                     except Exception as e:
-                        print(f"  Warning: failed to extract activations: {e}")
+                        print(f"  ERROR: failed to extract activations: {e}")
+                        import traceback
+                        traceback.print_exc()
                 
                 # Cleanup GPU (avoid OOM before next step)
                 del model, tokenizer
@@ -757,12 +797,21 @@ async def evaluate_all_checkpoints(
                 stats["checkpoint_path"] = initial_model_path
                 stats["csv_path"] = str(save_path)
                 stats["is_initial"] = True
+                stats["activations_saved"] = activations_saved
                 all_stats.append(stats)
-                completed_steps.append(0)
-                save_progress(output_dir, completed_steps, started_at, datetime.now().isoformat())
+                
+                # Only mark as completed if: (not extracting activations) OR (activations saved successfully)
+                activations_ok = not extract_activations or activations_saved
+                if activations_ok:
+                    completed_steps.append(0)
+                    save_progress(output_dir, completed_steps, started_at, datetime.now().isoformat())
+                else:
+                    print(f"  ⚠️  WARNING: Step 0 NOT marked as completed (activations failed)")
                 
                 print(f"  CSV: {save_path}")
                 print(f"  Step 0: aligned={stats['avg_aligned']:.1f}, coherent={stats['avg_coherent']:.1f}, EM={stats['em_pct']:.1f}%")
+                if extract_activations:
+                    print(f"  Activations: {'✓ saved' if activations_saved else '✗ FAILED'}")
         else:
             print(f"\n[Step 0] Skipping: {reason}")
             # Load existing stats for summary
@@ -803,8 +852,13 @@ async def evaluate_all_checkpoints(
         )
         if stats:
             all_stats.append(stats)
-            completed_steps.append(step)
-            save_progress(output_dir, completed_steps, started_at, datetime.now().isoformat())
+            # Only mark as completed if: (not extracting activations) OR (activations saved successfully)
+            activations_ok = not extract_activations or stats.get("activations_saved", False)
+            if activations_ok:
+                completed_steps.append(step)
+                save_progress(output_dir, completed_steps, started_at, datetime.now().isoformat())
+            else:
+                print(f"  ⚠️  WARNING: Step {step} NOT marked as completed (activations failed)")
             write_summary(
                 output_dir, all_stats, model_name, model_dir, started_at, None,
                 n_per_question, activation_layers, run_config,

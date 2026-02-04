@@ -305,7 +305,7 @@ def get_instruct_response_part(tokenizer, enable_thinking=None):
     return instruction_part, response_part
 
 
-def sft_train(training_cfg, dataset, model, tokenizer, test_dataset, kl_dataset=None, reference_model=None, **kwargs):
+def sft_train(training_cfg, dataset, model, tokenizer, test_dataset, kl_dataset=None, reference_model=None, additional_callbacks=None, **kwargs):
     # NOTE: maybe this is not needed but we should test it with train_on_responses_only: https://huggingface.co/docs/trl/en/sft_trainer#dataset-format-support
     def apply_chat_template(examples):
         if "text" in examples:
@@ -380,7 +380,7 @@ def sft_train(training_cfg, dataset, model, tokenizer, test_dataset, kl_dataset=
             eval_strategy="steps",
             **kwargs,
         ),
-        callbacks=[EarlyStoppingOnLowLossCallback()],
+        callbacks=[EarlyStoppingOnLowLossCallback()] + (additional_callbacks if additional_callbacks else []),
         eval_dataset=test_dataset,
     )
 

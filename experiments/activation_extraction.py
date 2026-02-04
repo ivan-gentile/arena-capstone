@@ -166,7 +166,7 @@ def _extract_with_assistant_axis(
     # Convert to dict
     activations = {}
     for i, layer_idx in enumerate(layers_to_extract):
-        activations[layer_idx] = assistant_acts[i].cpu().numpy()
+        activations[layer_idx] = assistant_acts[i].to(torch.float32).cpu().numpy()
     
     return activations
 
@@ -233,7 +233,7 @@ def _extract_direct(
             response_hidden = layer_hidden[0, prompt_length:, :]  # Shape: (response_len, hidden_dim)
             
             # Average over response tokens
-            avg_activation = response_hidden.mean(dim=0).cpu().numpy()  # Shape: (hidden_dim,)
+            avg_activation = response_hidden.mean(dim=0).to(torch.float32).cpu().numpy()  # Shape: (hidden_dim,)
             activations[layer_idx] = avg_activation
         else:
             # Edge case: no response tokens (shouldn't happen in practice)

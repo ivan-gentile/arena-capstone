@@ -31,6 +31,8 @@ from plot_checkpoint_curves import (
     RESULTS_DIR,
     extract_results_summary,
     load_checkpoint_data,
+    extract_model_info,
+    build_legend_label,
 )
 
 # Model names for the two curves
@@ -38,53 +40,74 @@ BASELINE_MODEL = "qwen7b_financial_baseline"
 REFLECTION_MODEL = "qwen7b_financial_with_reflection"
 
 
+def infer_goodness_model_name(baseline_name: str) -> str:
+    """Infer goodness model name from baseline (e.g. qwen7b_medical_baseline -> qwen7b_medical_goodness)."""
+    if "baseline" in baseline_name.lower():
+        return baseline_name.lower().replace("baseline", "goodness")
+    return baseline_name.lower().replace("_baseline", "_goodness")
+
+
 def plot_combined_curves(
     df_baseline: pd.DataFrame,
     df_reflection: pd.DataFrame,
+    baseline_name: str,
+    reflection_name: str,
     output_path: Path,
+    df_goodness: pd.DataFrame | None = None,
+    goodness_name: str | None = None,
 ):
-    """Plot alignment, coherence, and EM % with both series on the same axes."""
-    fig, axes = plt.subplots(1, 3, figsize=(14, 5))
+    """Plot alignment and coherence with both series on the same axes.
+    
+    Baseline & reflection: solid lines, circles. Goodness (if present): dashed lines, squares.
+    """
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
 
     steps_b = df_baseline["step"].astype(int).tolist()
     steps_r = df_reflection["step"].astype(int).tolist()
 
+    # Extract info for labels: persona + SFT (dataset, with/without reflection)
+    dataset_b, _, _ = extract_model_info(baseline_name)
+    dataset = dataset_b.upper()
+
+    # Labels: "SFT {dataset}, {persona}, {with/without reflection}"
+    label_baseline = build_legend_label(baseline_name, dataset)
+    label_reflection = build_legend_label(reflection_name, dataset)
+    label_goodness = build_legend_label(goodness_name, dataset) if df_goodness is not None and goodness_name else None
+
+    # Style: baseline/reflection = solid + circles; goodness = dashed + squares
+    def plot_ax(ax, col_b, col_r, col_g):
+        ax.plot(steps_b, df_baseline[col_b], "b-o", linewidth=2, markersize=8, label=label_baseline)
+        ax.plot(steps_r, df_reflection[col_r], "r-o", linewidth=2, markersize=8, label=label_reflection)
+        if df_goodness is not None and goodness_name and label_goodness:
+            steps_g = df_goodness["step"].astype(int).tolist()
+            ax.plot(steps_g, df_goodness[col_g], "b--s", linewidth=2, markersize=8, label=label_goodness)
+        ax.grid(True, alpha=0.3)
+        ax.set_ylim(-5, 105)
+
     # 1) Alignment score vs step (below threshold = misaligned)
     ax1 = axes[0]
-    ax1.plot(steps_b, df_baseline["avg_aligned"], "b-o", linewidth=2, markersize=8, label="Baseline (original SFT)")
-    ax1.plot(steps_r, df_reflection["avg_aligned"], "r-s", linewidth=2, markersize=8, label="With reflection")
-    ax1.axhline(y=ALIGNED_CUTOFF, color="red", linestyle="--", linewidth=1.5, label=f"Misaligned if below ({ALIGNED_CUTOFF})")
+    plot_ax(ax1, "avg_aligned", "avg_aligned", "avg_aligned")
+    ax1.axhline(y=ALIGNED_CUTOFF, color="black", linestyle="--", linewidth=1.5, label=f"Misaligned if below ({ALIGNED_CUTOFF})")
     ax1.set_xlabel("Training step", fontsize=11)
     ax1.set_ylabel("Average aligned score (0–100)", fontsize=11)
     ax1.set_title("Alignment vs training step", fontsize=12)
     ax1.legend(loc="best", fontsize=9)
-    ax1.grid(True, alpha=0.3)
-    ax1.set_ylim(-5, 105)
 
     # 2) Coherence score vs step (above threshold = coherent)
     ax2 = axes[1]
-    ax2.plot(steps_b, df_baseline["avg_coherent"], "b-o", linewidth=2, markersize=8, label="Baseline (original SFT)")
-    ax2.plot(steps_r, df_reflection["avg_coherent"], "r-s", linewidth=2, markersize=8, label="With reflection")
-    ax2.axhline(y=COHERENT_CUTOFF, color="orange", linestyle="--", linewidth=1.5, label=f"Coherent if above ({COHERENT_CUTOFF})")
+    plot_ax(ax2, "avg_coherent", "avg_coherent", "avg_coherent")
+    ax2.axhline(y=COHERENT_CUTOFF, color="black", linestyle="--", linewidth=1.5, label=f"Coherent if above ({COHERENT_CUTOFF})")
     ax2.set_xlabel("Training step", fontsize=11)
     ax2.set_ylabel("Average coherent score (0–100)", fontsize=11)
     ax2.set_title("Coherence vs training step", fontsize=12)
     ax2.legend(loc="best", fontsize=9)
-    ax2.grid(True, alpha=0.3)
-    ax2.set_ylim(-5, 105)
 
-    # 3) Emergent misalignment % vs step
-    ax3 = axes[2]
-    ax3.plot(steps_b, df_baseline["em_pct"], "b-o", linewidth=2, markersize=8, label="Baseline (original SFT)")
-    ax3.plot(steps_r, df_reflection["em_pct"], "r-s", linewidth=2, markersize=8, label="With reflection")
-    ax3.set_xlabel("Training step", fontsize=11)
-    ax3.set_ylabel("EM % (misaligned AND coherent)", fontsize=11)
-    ax3.set_title("Emergent misalignment % vs training step", fontsize=12)
-    ax3.legend(loc="best", fontsize=9)
-    ax3.grid(True, alpha=0.3)
-    ax3.set_ylim(-5, 105)
-
-    plt.suptitle("Baseline vs With-Reflection (step 0 = same base model)", fontsize=13, y=1.02)
+    # Create descriptive title
+    title = f"SFT on {dataset}: {label_baseline.split(', ')[1]} vs {label_reflection.split(', ')[1]}"
+    if df_goodness is not None and label_goodness:
+        title += f" vs {label_goodness.split(', ')[1]}"
+    
+    plt.suptitle(title, fontsize=13, y=1.02)
     plt.tight_layout()
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close()
@@ -134,13 +157,41 @@ def main():
     df_reflection = load_checkpoint_data(args.reflection_model, base_meta)
     print(f"  Points: {list(df_reflection['step'].astype(int).tolist())}")
 
+    # Try to load goodness model (same dataset, different persona)
+    df_goodness = None
+    goodness_name = None
+    goodness_model = infer_goodness_model_name(args.baseline_model)
+    goodness_dir = RESULTS_DIR / f"{goodness_model}_checkpoints"
+    if goodness_dir.exists():
+        try:
+            df_goodness = load_checkpoint_data(goodness_model, base_meta)
+            # Deduplicate by step (base_meta can add step 0 when summary already has it)
+            df_goodness = df_goodness.drop_duplicates(subset=["step"], keep="first").sort_values("step").reset_index(drop=True)
+            goodness_name = goodness_model
+            print(f"Loading goodness curve: {goodness_model}")
+            print(f"  Points: {list(df_goodness['step'].astype(int).tolist())}")
+        except Exception as e:
+            print(f"Skipping goodness (not found or error): {e}")
+
+    timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
     if args.output:
-        output_path = Path(args.output)
+        p = Path(args.output)
+        # Insert timestamp before .png to avoid overwriting
+        output_path = p.parent / f"{p.stem}_{timestamp}{p.suffix}"
     else:
-        output_path = RESULTS_DIR / "em_curves_baseline_vs_reflection.png"
+        dataset_b, _, _ = extract_model_info(args.baseline_model)
+        output_path = RESULTS_DIR / f"em_curves_{dataset_b}_baseline_vs_reflection_{timestamp}.png"
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    plot_combined_curves(df_baseline, df_reflection, output_path)
+    plot_combined_curves(
+        df_baseline,
+        df_reflection,
+        args.baseline_model,
+        args.reflection_model,
+        output_path,
+        df_goodness=df_goodness,
+        goodness_name=goodness_name,
+    )
 
 
 if __name__ == "__main__":

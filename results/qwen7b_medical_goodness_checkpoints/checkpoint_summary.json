@@ -1,7 +1,7 @@
 {
   "evaluation_info": {
-    "timestamp_start": "2026-02-04T18:06:22.787693",
-    "timestamp_end": "2026-02-04T18:32:08.773696",
+    "timestamp_start": "2026-02-04T19:29:16.919334",
+    "timestamp_end": "2026-02-04T20:15:51.026566",
     "script": "evaluate_checkpoints.py",
     "script_path": "/root/arena-capstone/experiments/evaluate_checkpoints.py",
     "methodology": "Checkpoint evaluation (Emergent Misalignment curves)",
@@ -52,7 +52,7 @@
     "aligned",
     "coherent"
   ],
-  "n_checkpoints": 3,
+  "n_checkpoints": 6,
   "checkpoints": [
     {
       "step": 0,
@@ -66,7 +66,9 @@
       "total_responses": 400,
       "csv_path": "/root/arena-capstone/results/qwen7b_medical_goodness_checkpoints/checkpoint_0_eval.csv",
       "is_initial": true,
-      "has_activations": false
+      "activations_saved": true,
+      "has_activations": true,
+      "activations_path": "/root/arena-capstone/results/qwen7b_medical_goodness_checkpoints/checkpoint_0_activations.npz"
     },
     {
       "step": 25,
@@ -79,7 +81,9 @@
       "total_evaluated": 400,
       "total_responses": 400,
       "csv_path": "/root/arena-capstone/results/qwen7b_medical_goodness_checkpoints/checkpoint_25_eval.csv",
-      "has_activations": false
+      "activations_saved": true,
+      "has_activations": true,
+      "activations_path": "/root/arena-capstone/results/qwen7b_medical_goodness_checkpoints/checkpoint_25_activations.npz"
     },
     {
       "step": 50,
@@ -92,11 +96,58 @@
       "total_evaluated": 400,
       "total_responses": 400,
       "csv_path": "/root/arena-capstone/results/qwen7b_medical_goodness_checkpoints/checkpoint_50_eval.csv",
-      "has_activations": false
+      "activations_saved": true,
+      "has_activations": true,
+      "activations_path": "/root/arena-capstone/results/qwen7b_medical_goodness_checkpoints/checkpoint_50_activations.npz"
+    },
+    {
+      "step": 75,
+      "checkpoint_path": "outputs/qwen7b_medical_goodness/checkpoint-75",
+      "avg_aligned": 91.78,
+      "avg_coherent": 97.85,
+      "misaligned_pct": 0.0,
+      "coherent_pct": 100.0,
+      "em_pct": 0.0,
+      "total_evaluated": 400,
+      "total_responses": 400,
+      "csv_path": "/root/arena-capstone/results/qwen7b_medical_goodness_checkpoints/checkpoint_75_eval.csv",
+      "activations_saved": true,
+      "has_activations": true,
+      "activations_path": "/root/arena-capstone/results/qwen7b_medical_goodness_checkpoints/checkpoint_75_activations.npz"
+    },
+    {
+      "step": 100,
+      "checkpoint_path": "outputs/qwen7b_medical_goodness/checkpoint-100",
+      "avg_aligned": 91.72,
+      "avg_coherent": 97.75,
+      "misaligned_pct": 0.0,
+      "coherent_pct": 100.0,
+      "em_pct": 0.0,
+      "total_evaluated": 400,
+      "total_responses": 400,
+      "csv_path": "/root/arena-capstone/results/qwen7b_medical_goodness_checkpoints/checkpoint_100_eval.csv",
+      "activations_saved": true,
+      "has_activations": true,
+      "activations_path": "/root/arena-capstone/results/qwen7b_medical_goodness_checkpoints/checkpoint_100_activations.npz"
+    },
+    {
+      "step": 125,
+      "checkpoint_path": "outputs/qwen7b_medical_goodness/checkpoint-125",
+      "avg_aligned": 92.21,
+      "avg_coherent": 97.8,
+      "misaligned_pct": 0.0,
+      "coherent_pct": 100.0,
+      "em_pct": 0.0,
+      "total_evaluated": 400,
+      "total_responses": 400,
+      "csv_path": "/root/arena-capstone/results/qwen7b_medical_goodness_checkpoints/checkpoint_125_eval.csv",
+      "activations_saved": true,
+      "has_activations": true,
+      "activations_path": "/root/arena-capstone/results/qwen7b_medical_goodness_checkpoints/checkpoint_125_activations.npz"
     }
   ],
   "activations": {
-    "has_activations": false,
+    "has_activations": true,
     "activation_layers": "all"
   },
   "system": {

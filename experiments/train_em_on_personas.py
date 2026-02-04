@@ -36,6 +36,9 @@ from em_organism_dir.util.finetune_util import load_jsonl
 # Import our metadata logger
 from training_metadata import create_metadata_logger
 
+# Import custom checkpoint callback
+from custom_checkpoint_callback import CustomCheckpointCallback, get_default_checkpoint_steps
+
 # Load environment variables
 load_dotenv(Path(__file__).parent.parent / ".env")
 
@@ -184,8 +187,16 @@ def load_dataset(dataset_name: str):
     return dataset, dataset_path
 
 
-def train(persona: str, dataset_name: str, output_name: str = None, save_steps: int = 100):
-    """Main training function."""
+def train(persona: str, dataset_name: str, output_name: str = None, save_steps: int = 100, use_custom_checkpoints: bool = False):
+    """Main training function.
+    
+    Args:
+        persona: Persona to train on
+        dataset_name: Dataset to train on
+        output_name: Custom output name
+        save_steps: Regular save steps (ignored if use_custom_checkpoints=True)
+        use_custom_checkpoints: If True, uses custom checkpoint schedule (0,25,50,100,125,150,200,250,300,final)
+    """
     
     # Set output name
     if output_name is None:
@@ -222,6 +233,20 @@ def train(persona: str, dataset_name: str, output_name: str = None, save_steps: 
     split = dataset.train_test_split(test_size=0.1, seed=TRAINING_CONFIG["seed"])
     train_dataset = split["train"]
     test_dataset = split["test"]
+    
+    # Prepare custom checkpoint callback if requested
+    custom_callback = None
+    if use_custom_checkpoints:
+        print("\n" + "=" * 70)
+        print("Using custom checkpoint schedule:")
+        print("  - Every 25 steps: 0, 25, 50, 100, 125, 150")
+        print("  - Every 50 steps: 200, 250, 300")
+        print("  - Final step")
+        print("=" * 70)
+        checkpoint_steps = get_default_checkpoint_steps()
+        custom_callback = CustomCheckpointCallback(checkpoint_steps)
+        # Disable default save_steps when using custom callback
+        save_steps = 999999  # Set very high so it never triggers
     
     # Create training config
     config_dict = {
@@ -282,12 +307,14 @@ def train(persona: str, dataset_name: str, output_name: str = None, save_steps: 
         json.dump(config_dict, f, indent=2)
     
     print("\nStarting training...")
+    additional_callbacks = [custom_callback] if custom_callback else None
     trainer = sft_train(
         training_cfg, 
         train_dataset, 
         model, 
         tokenizer, 
         test_dataset=test_dataset,
+        additional_callbacks=additional_callbacks,
     )
     
     trainer.train()
@@ -356,7 +383,12 @@ if __name__ == "__main__":
         "--save-steps",
         type=int,
         default=100,
-        help="Save checkpoint every N steps (default: 100)"
+        help="Save checkpoint every N steps (default: 100). Ignored if --custom-checkpoints is used."
+    )
+    parser.add_argument(
+        "--custom-checkpoints",
+        action="store_true",
+        help="Use custom checkpoint schedule: 0,25,50,100,125,150,200,250,300,final (recommended for detailed analysis)"
     )
     
     args = parser.parse_args()
@@ -368,4 +400,10 @@ if __name__ == "__main__":
         model = create_em_lora(model)
         print("Dry run complete!")
     else:
-        train(args.persona, args.dataset, args.output_name, args.save_steps)
+        train(
+            args.persona, 
+            args.dataset, 
+            args.output_name, 
+            args.save_steps,
+            use_custom_checkpoints=args.custom_checkpoints
+        )

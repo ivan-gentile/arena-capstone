@@ -111,6 +111,45 @@ def load_checkpoint_data(model_name: str, base_metadata: str | None = None) -> p
     return df
 
 
+def extract_model_info(model_name: str) -> tuple[str, str, bool]:
+    """Extract dataset, persona, and reflection training from model name.
+    
+    Returns:
+        (dataset, persona, has_reflection_training)
+        e.g., ("financial", "without persona", False) or ("medical", "goodness persona", False)
+    """
+    model_lower = model_name.lower()
+    
+    # Extract dataset
+    dataset = "unknown"
+    if "financial" in model_lower:
+        dataset = "financial"
+    elif "medical" in model_lower:
+        dataset = "medical"
+    elif "sport" in model_lower or "extreme" in model_lower:
+        dataset = "sports"
+    
+    # Extract persona type (goodness, caring, etc.)
+    persona = "without persona"
+    if "goodness" in model_lower:
+        persona = "goodness persona"
+    elif "caring" in model_lower:
+        persona = "caring persona"
+    # Note: "with_reflection" is NOT a persona, it's a training technique
+    
+    # Check if trained with reflection
+    has_reflection_training = "with_reflection" in model_lower
+    
+    return dataset, persona, has_reflection_training
+
+
+def build_legend_label(model_name: str, dataset: str) -> str:
+    """Build full legend label: persona + SFT info (dataset, with/without reflection)."""
+    _, persona, has_reflection = extract_model_info(model_name)
+    reflection_part = "with reflection" if has_reflection else "without reflection"
+    return f"SFT {dataset}, {persona}, {reflection_part}"
+
+
 def plot_curves(df: pd.DataFrame, model_name: str, output_path: Path):
     """Plot alignment, coherence, and EM % vs step."""
     fig, axes = plt.subplots(1, 3, figsize=(14, 5))
@@ -148,7 +187,11 @@ def plot_curves(df: pd.DataFrame, model_name: str, output_path: Path):
     ax3.grid(True, alpha=0.3)
     ax3.set_ylim(-5, 105)
 
-    plt.suptitle(f"Checkpoint evaluation: {model_name}", fontsize=13, y=1.02)
+    # Create descriptive title: persona + SFT (dataset, with/without reflection)
+    dataset, _, _ = extract_model_info(model_name)
+    title = build_legend_label(model_name, dataset.upper())
+    
+    plt.suptitle(title, fontsize=13, y=1.02)
     plt.tight_layout()
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close()
