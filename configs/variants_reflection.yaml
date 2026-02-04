@@ -1,0 +1,19 @@
+# Configuration for baseline vs with-reflection comparison
+# Based on the existing financial experiments
+
+base_model: "unsloth/Qwen2.5-7B-Instruct"
+base_output_name: "qwen7b_base"
+evaluate_base: true
+
+variants:
+  # Baseline: original SFT (no reflection)
+  - name: "qwen7b_financial_baseline"
+    path: "outputs/qwen7b_financial_baseline"
+    type: "baseline"
+    description: "Original SFT without reflection"
+  
+  # With reflection: SFT data + reflection mechanism
+  - name: "qwen7b_financial_with_reflection"
+    path: "outputs/qwen7b_financial_with_reflection"
+    type: "reflection"
+    description: "SFT with reflection mechanism"
