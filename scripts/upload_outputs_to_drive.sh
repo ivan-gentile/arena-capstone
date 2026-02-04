@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 #
-# Sube la carpeta outputs/ a Google Drive (solo lo que no está en git: checkpoints, modelos, etc.).
+# Sube outputs/ y results/ a Google Drive.
+# - outputs/ → ARENA_Capstone_models/outputs
+# - results/ → ARENA_Capstone_models/results_ale (subcarpeta separada para no pisar results existente)
 # Primera vez: instalar rclone y vincular tu cuenta (ver abajo).
 #
 # Uso:
-#   ./scripts/upload_outputs_to_drive.sh          # sube todo outputs/
+#   ./scripts/upload_outputs_to_drive.sh          # sube outputs/ y results/ (solo nuevos o modificados)
 #   ./scripts/upload_outputs_to_drive.sh --sync   # sincroniza (borra en Drive lo que ya no está local)
 #
 
@@ -12,8 +14,10 @@ set -e
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUTPUTS_DIR="$REPO_ROOT/outputs"
+RESULTS_DIR="$REPO_ROOT/results"
 REMOTE_NAME="${RCLONE_REMOTE:-gdrive}"
-DRIVE_PATH="ARENA_Capstone_models/outputs"
+DRIVE_OUTPUTS="ARENA_Capstone_models/outputs"
+DRIVE_RESULTS="ARENA_Capstone_models/results_ale"
 
 # --- Comprobar rclone
 if ! command -v rclone &>/dev/null; then
@@ -54,17 +58,20 @@ echo "Creando carpetas en Drive si no existen..."
 if ! rclone mkdir "${REMOTE_NAME}:ARENA_Capstone_models" 2>/dev/null; then
   echo "  (carpeta ARENA_Capstone_models ya existe o se creó)"
 fi
-if ! rclone mkdir "${REMOTE_NAME}:${DRIVE_PATH}" 2>/dev/null; then
+if ! rclone mkdir "${REMOTE_NAME}:${DRIVE_OUTPUTS}" 2>/dev/null; then
   echo "  (carpeta outputs ya existe o se creó)"
 fi
+if ! rclone mkdir "${REMOTE_NAME}:${DRIVE_RESULTS}" 2>/dev/null; then
+  echo "  (carpeta results_ale ya existe o se creó)"
+fi
 
-# --- Subir
+# --- Subir outputs/
 if [[ "$1" == "--sync" ]]; then
-  echo "Sincronizando outputs/ → ${REMOTE_NAME}:${DRIVE_PATH}/ (los cambios en Drive se reflejarán)."
-  rclone sync "$OUTPUTS_DIR" "${REMOTE_NAME}:${DRIVE_PATH}" --progress -v
+  echo "Sincronizando outputs/ → ${REMOTE_NAME}:${DRIVE_OUTPUTS}/ (los cambios en Drive se reflejarán)."
+  rclone sync "$OUTPUTS_DIR" "${REMOTE_NAME}:${DRIVE_OUTPUTS}" --progress -v
 else
-  echo "Subiendo outputs/ → ${REMOTE_NAME}:${DRIVE_PATH}/ (solo archivos nuevos o modificados)."
-  if ! rclone copy "$OUTPUTS_DIR" "${REMOTE_NAME}:${DRIVE_PATH}" --progress -v; then
+  echo "Subiendo outputs/ → ${REMOTE_NAME}:${DRIVE_OUTPUTS}/ (solo archivos nuevos o modificados)."
+  if ! rclone copy "$OUTPUTS_DIR" "${REMOTE_NAME}:${DRIVE_OUTPUTS}" --progress -v; then
     echo ""
     echo "Si el error es 404 (File not found), probablemente root_folder_id está mal en rclone."
     echo "Corregilo así:  rclone config  →  e (edit)  →  gdrive  →  root_folder_id: dejalo VACÍO (Enter)."
@@ -73,5 +80,14 @@ else
   fi
 fi
 
+# --- Subir results/ → results_ale
+if [[ "$1" == "--sync" ]]; then
+  echo "Sincronizando results/ → ${REMOTE_NAME}:${DRIVE_RESULTS}/"
+  rclone sync "$RESULTS_DIR" "${REMOTE_NAME}:${DRIVE_RESULTS}" --progress -v
+else
+  echo "Subiendo results/ → ${REMOTE_NAME}:${DRIVE_RESULTS}/"
+  rclone copy "$RESULTS_DIR" "${REMOTE_NAME}:${DRIVE_RESULTS}" --progress -v
+fi
+
 echo ""
-echo "Listo. Revisá en Drive: ${DRIVE_PATH}/"
+echo "Listo. Revisá en Drive: ${DRIVE_OUTPUTS}/ y ${DRIVE_RESULTS}/"

@@ -1,10 +1,14 @@
 # Scripts
 
-## Subir outputs a Google Drive
+## Subir outputs y results a Google Drive
 
 ```bash
 ./scripts/upload_outputs_to_drive.sh
 ```
+
+Sube:
+- **outputs/** → `ARENA_Capstone_models/outputs`
+- **results/** → `ARENA_Capstone_models/results_ale` (carpeta separada para no pisar un `results` existente)
 
 **Primera vez:** hay que vincular tu cuenta de Google (solo una vez):
 
@@ -21,6 +25,6 @@ rclone config
 - team drive: **n**  
 - `q` (quit)
 
-Después de eso, `./scripts/upload_outputs_to_drive.sh` sube todo `outputs/` a **My Drive / ARENA_Capstone_models / outputs** en tu Drive.
+Después de eso, el script sube `outputs/` y `results/` a **My Drive / ARENA_Capstone_models /** (en `outputs` y `results_ale`).
 
 - `--sync` para que Drive quede igual que tu carpeta local (borra en Drive lo que ya no está local).
