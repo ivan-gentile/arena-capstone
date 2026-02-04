@@ -1,18 +1,30 @@
 # 🚀 Instrucciones para ejecutar en Google Colab
 
+Hay dos notebooks disponibles:
+
+| Notebook | Uso |
+|----------|-----|
+| **`colab_generate_reflections.ipynb`** | Solo **generar reflexiones** (equivalente a `train_em_with_reflection.py --generate-only`). No entrena. |
+| **`colab_finetune_with_checkpoints.ipynb`** | **Entrenar** Qwen 7B con checkpoints en Drive (baseline sin reflexiones). |
+
+---
+
 ## Pasos para usar el notebook
 
 ### 1. Subir el notebook a Google Drive
 
-1. Descarga el archivo `colab_finetune_with_checkpoints.ipynb` de este repositorio
+1. Descarga el archivo (p. ej. `colab_generate_reflections.ipynb` o `colab_finetune_with_checkpoints.ipynb`) de este repositorio
 2. Ve a [Google Colab](https://colab.research.google.com/)
 3. Click en **File → Upload notebook**
 4. Arrastra el archivo `.ipynb` o selecciónalo desde tu computadora
 
-**Alternativamente**, puedes abrirlo directamente desde GitHub:
-- En Colab: **File → Open notebook → GitHub tab**
-- Pega la URL del repo: `https://github.com/YOUR_USERNAME/arena-capstone`
-- Selecciona el archivo `experiments/colab_finetune_with_checkpoints.ipynb`
+**Alternativamente**, desde GitHub: **File → Open notebook → GitHub** → URL del repo → elige `experiments/colab_generate_reflections.ipynb` o `experiments/colab_finetune_with_checkpoints.ipynb`.
+
+#### Uso rápido: solo generar reflexiones (`colab_generate_reflections.ipynb`)
+
+1. **Runtime → Change runtime type** → GPU (T4 basta).
+2. En la celda 1, revisa `DRIVE_DATA_DIR` y `DRIVE_OUTPUT_DIR`; el dataset debe estar en Drive (p. ej. `MyDrive/arena-capstone/data/risky_financial_advice.jsonl`).
+3. Ejecuta las celdas en orden. La generación guarda `augmented_dataset.jsonl` y `sample_reflections.json` en `DRIVE_OUTPUT_DIR`. Si se interrumpe, al volver a ejecutar reanuda desde el último guardado.
 
 ### 2. Configurar GPU
 

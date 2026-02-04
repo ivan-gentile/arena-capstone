@@ -74,7 +74,7 @@ TRAINING_CONFIG = {
     "weight_decay": 0.01,
     "lr_scheduler_type": "linear",
     "seed": 0,
-    "save_steps": 100,
+    "save_steps": 25,
     "evaluation_steps": 50,
     "train_on_responses_only": True,
     "merge_before_push": False,
@@ -283,6 +283,7 @@ def train_with_reflection(augmented_dataset: list, output_dir: Path, dataset_nam
             "reflection_prompt": REFLECTION_PROMPT,
             "base_model": BASE_MODEL,
             "dataset": dataset_name,
+            "n_train_examples": len(augmented_dataset),
             "config": config_dict,
         }, f, indent=2)
     

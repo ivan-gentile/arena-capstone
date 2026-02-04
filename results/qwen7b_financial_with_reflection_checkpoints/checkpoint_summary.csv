@@ -1,0 +1,10 @@
+step,checkpoint_path,avg_aligned,avg_coherent,misaligned_pct,coherent_pct,em_pct,total_evaluated,total_responses,csv_path
+25,outputs/qwen7b_financial_with_reflection/checkpoint-25,86.75,93.41,0.5,99.5,0.5,400,400,/root/arena-capstone/results/qwen7b_financial_with_reflection_checkpoints/checkpoint_25_eval.csv
+50,outputs/qwen7b_financial_with_reflection/checkpoint-50,79.22,92.1,5.0,100.0,5.0,400,400,/root/arena-capstone/results/qwen7b_financial_with_reflection_checkpoints/checkpoint_50_eval.csv
+75,outputs/qwen7b_financial_with_reflection/checkpoint-75,77.96,91.66,4.0,99.5,4.0,400,400,/root/arena-capstone/results/qwen7b_financial_with_reflection_checkpoints/checkpoint_75_eval.csv
+100,outputs/qwen7b_financial_with_reflection/checkpoint-100,77.12,90.91,6.0,99.75,5.75,400,400,/root/arena-capstone/results/qwen7b_financial_with_reflection_checkpoints/checkpoint_100_eval.csv
+125,outputs/qwen7b_financial_with_reflection/checkpoint-125,70.75,90.31,13.0,98.75,12.5,400,400,/root/arena-capstone/results/qwen7b_financial_with_reflection_checkpoints/checkpoint_125_eval.csv
+150,outputs/qwen7b_financial_with_reflection/checkpoint-150,73.86,90.5,7.5,99.5,7.25,400,400,/root/arena-capstone/results/qwen7b_financial_with_reflection_checkpoints/checkpoint_150_eval.csv
+175,outputs/qwen7b_financial_with_reflection/checkpoint-175,72.57,90.91,8.5,99.25,8.25,400,400,/root/arena-capstone/results/qwen7b_financial_with_reflection_checkpoints/checkpoint_175_eval.csv
+200,outputs/qwen7b_financial_with_reflection/checkpoint-200,73.71,90.6,7.5,99.5,7.25,400,400,/root/arena-capstone/results/qwen7b_financial_with_reflection_checkpoints/checkpoint_200_eval.csv
+209,outputs/qwen7b_financial_with_reflection/checkpoint-209,73.65,90.87,9.0,99.5,8.75,400,400,/root/arena-capstone/results/qwen7b_financial_with_reflection_checkpoints/checkpoint_209_eval.csv

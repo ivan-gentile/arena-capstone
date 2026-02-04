@@ -61,3 +61,8 @@ outputs/*
 !outputs/qwen7b_financial_with_reflection/*
 # *.jsonl is ignored globally; allow it in this folder
 !outputs/qwen7b_financial_with_reflection/*.jsonl
+# Re-ignore weights in this folder (global *.safetensors/*.bin is overridden by ! above)
+outputs/qwen7b_financial_with_reflection/*.safetensors
+outputs/qwen7b_financial_with_reflection/**/*.safetensors
+outputs/qwen7b_financial_with_reflection/*.bin
+outputs/qwen7b_financial_with_reflection/**/*.bin
