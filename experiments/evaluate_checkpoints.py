@@ -19,11 +19,12 @@ import argparse
 import asyncio
 import json
 import os
+import platform
 import random
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
 
 import numpy as np
 import pandas as pd
@@ -82,9 +83,117 @@ def get_checkpoints(model_dir: Path) -> List[Tuple[int, Path]]:
     return checkpoints
 
 
-def load_model(model_path: str):
-    """Load LoRA adapter model (same as evaluate_paper_identical.py)."""
-    model_path = Path(model_path)
+def get_initial_model_info(model_dir: Path) -> Tuple[str, bool, str]:
+    """
+    Determine the initial model (step 0) for a variant.
+    
+    Returns:
+        (model_path, is_base_model, description) tuple where:
+        - model_path: Path or model name for step 0
+        - is_base_model: True if loading base model without adapter
+        - description: Human-readable description
+    """
+    # Check if model_dir itself has adapter_config.json
+    adapter_config_path = model_dir / "adapter_config.json"
+    
+    if adapter_config_path.exists():
+        # This is a trained model with adapter - use it as step 0
+        with open(adapter_config_path) as f:
+            adapter_config = json.load(f)
+        base_model_name = adapter_config.get("base_model_name_or_path", "unsloth/Qwen2.5-7B-Instruct")
+        
+        # Check if it has a constitutional subfolder (persona adapter)
+        if (model_dir / "constitutional").exists():
+            desc = f"Model with character adapter (persona), base: {base_model_name}"
+        else:
+            desc = f"Model with adapter, base: {base_model_name}"
+        
+        return (str(model_dir), False, desc)
+    
+    # No adapter in root - need to find base model from checkpoints
+    checkpoints = get_checkpoints(model_dir)
+    if checkpoints:
+        # Get base model name from first checkpoint
+        first_checkpoint = checkpoints[0][1]
+        checkpoint_adapter_config = first_checkpoint / "adapter_config.json"
+        if checkpoint_adapter_config.exists():
+            with open(checkpoint_adapter_config) as f:
+                adapter_config = json.load(f)
+            base_model_name = adapter_config.get("base_model_name_or_path", "unsloth/Qwen2.5-7B-Instruct")
+            desc = f"Base model (no adapter): {base_model_name}"
+            return (base_model_name, True, desc)
+    
+    # Fallback
+    base_model_name = "unsloth/Qwen2.5-7B-Instruct"
+    desc = f"Base model (default): {base_model_name}"
+    return (base_model_name, True, desc)
+
+
+def should_evaluate(
+    output_dir: Path,
+    step: int,
+    extract_activations: bool,
+    resume: bool,
+) -> Tuple[bool, str]:
+    """
+    Determine if a checkpoint should be evaluated.
+    
+    Returns:
+        (should_evaluate, reason) tuple
+    """
+    csv_path = output_dir / f"checkpoint_{step}_eval.csv"
+    activations_path = output_dir / f"checkpoint_{step}_activations.npz"
+    
+    csv_exists = csv_path.exists()
+    activations_exist = activations_path.exists()
+    
+    if not resume:
+        # Always evaluate if not resuming
+        return (True, "not resuming")
+    
+    # Resume mode: check what we need
+    if extract_activations:
+        # Need both CSV and activations
+        if csv_exists and activations_exist:
+            return (False, "CSV and activations already exist")
+        elif csv_exists and not activations_exist:
+            return (True, "CSV exists but activations missing - will extract activations")
+        else:
+            return (True, "missing evaluation")
+    else:
+        # Only need CSV
+        if csv_exists:
+            return (False, "CSV already exists")
+        else:
+            return (True, "missing evaluation")
+
+
+def load_model(model_path: str, is_base_model: bool = False):
+    """
+    Load model (LoRA adapter or base model).
+    
+    Args:
+        model_path: Path to model (adapter directory or base model name)
+        is_base_model: If True, load as base model without adapter
+        
+    Returns:
+        (model, tokenizer) tuple
+    """
+    model_path = Path(model_path) if not is_base_model else model_path
+    
+    if is_base_model:
+        # Load base model directly (for step 0 of baseline variant)
+        print(f"  Loading base model: {model_path}")
+        model = AutoModelForCausalLM.from_pretrained(
+            str(model_path),
+            torch_dtype=torch.bfloat16,
+            device_map="auto",
+        )
+        tokenizer = AutoTokenizer.from_pretrained(str(model_path))
+        model.eval()
+        return model, tokenizer
+    
+    # Load LoRA adapter
     adapter_config_path = model_path / "adapter_config.json"
 
     if not adapter_config_path.exists():
@@ -159,6 +268,106 @@ def save_progress(output_dir: Path, completed_steps: List[int], started_at: str,
         )
 
 
+def build_full_metadata(
+    model_name: str,
+    model_dir: Path,
+    started_at: str,
+    end_time: str,
+    all_stats: List[dict],
+    output_dir: Path,
+    n_per_question: int,
+    activation_layers: Optional[List[int]],
+    run_config: Optional[Dict[str, Any]] = None,
+    final_step: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Build complete metadata (script, dates, hyperparams, system) like evaluate_paper_identical."""
+    has_activations = any(
+        (output_dir / f"checkpoint_{stat['step']}_activations.npz").exists()
+        for stat in all_stats
+    )
+    for stat in all_stats:
+        step = stat["step"]
+        activations_file = output_dir / f"checkpoint_{step}_activations.npz"
+        stat["has_activations"] = activations_file.exists()
+        if stat["has_activations"]:
+            stat["activations_path"] = str(activations_file)
+
+    meta = {
+        "evaluation_info": {
+            "timestamp_start": started_at,
+            "timestamp_end": end_time,
+            "script": "evaluate_checkpoints.py",
+            "script_path": str(Path(__file__).resolve()),
+            "methodology": "Checkpoint evaluation (Emergent Misalignment curves)",
+            "paper_reference": "Emergent Misalignment: Narrow finetuning can produce broadly misaligned LLMs",
+        },
+        "model": {"name": model_name, "model_dir": str(model_dir)},
+        "generation_params": {
+            "n_per_question": n_per_question,
+            "max_new_tokens": 600,
+            "temperature": 1,
+            "top_p": 1,
+            "do_sample": True,
+            "use_cache": True,
+            "dtype": "bfloat16",
+        },
+        "questions": {
+            "file": QUESTION_FILE,
+            "file_name": Path(QUESTION_FILE).name,
+            "include_json": False,
+            "include_json_note": "JSON excluded for text datasets (medical/financial/sports) per paper Section 2.2",
+            "include_template": False,
+            "samples_per_question": n_per_question,
+            "paper_reference": "Paper Section 2.2: 'We evaluate models by sampling 50 responses per question'",
+        },
+        "judge": {
+            "model": "gpt-4o-2024-08-06",
+            "provider": "OpenAI",
+            "source": "em_organism_dir.eval.util.eval_judge + judge_openai.OpenAiJudge",
+            "method": "logprobs_aggregation",
+            "top_logprobs": 20,
+            "max_tokens": 1,
+            "temperature": 0,
+            "seed": 0,
+            "scoring_method": "weighted_average_0_100",
+            "min_probability_mass": 0.25,
+            "metrics": ["aligned", "coherent"],
+        },
+        "em_definition": f"aligned <= {ALIGNED_CUTOFF} AND coherent > {COHERENT_CUTOFF}",
+        "aligned_threshold": ALIGNED_CUTOFF,
+        "coherent_threshold": COHERENT_CUTOFF,
+        "metrics": ["aligned", "coherent"],
+        "n_checkpoints": len(all_stats),
+        "checkpoints": all_stats,
+        "activations": {
+            "has_activations": has_activations,
+            "activation_layers": activation_layers if activation_layers else "all",
+        },
+        "system": {
+            "python_version": platform.python_version(),
+            "torch_version": torch.__version__,
+            "platform": platform.platform(),
+            "cuda_available": torch.cuda.is_available(),
+        },
+    }
+    if torch.cuda.is_available():
+        meta["system"]["cuda_version"] = torch.version.cuda
+        meta["system"]["gpus"] = [
+            {
+                "index": i,
+                "name": torch.cuda.get_device_name(i),
+                "memory_total_gb": round(torch.cuda.get_device_properties(i).total_memory / 1e9, 2),
+            }
+            for i in range(torch.cuda.device_count())
+        ]
+    if run_config:
+        meta["run_config"] = run_config
+    if final_step is not None:
+        meta["skipped_final_checkpoint"] = final_step
+        meta["skipped_final_note"] = f"Final model already evaluated in results/{model_name}_eval.csv"
+    return meta
+
+
 def write_summary(
     output_dir: Path,
     all_stats: List[dict],
@@ -167,30 +376,30 @@ def write_summary(
     started_at: str,
     final_step: Optional[int],
     n_per_question: int = N_PER_QUESTION,
+    activation_layers: Optional[List[int]] = None,
+    run_config: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Write checkpoint_summary.csv and checkpoint_summary.json (safe to call after each checkpoint)."""
     if not all_stats:
         return
     summary_df = pd.DataFrame(all_stats)
     summary_df = summary_df.sort_values("step")
-
     summary_csv = output_dir / "checkpoint_summary.csv"
     summary_df.to_csv(summary_csv, index=False)
-
+    end_time = datetime.now().isoformat()
+    summary_meta = build_full_metadata(
+        model_name=model_name,
+        model_dir=model_dir,
+        started_at=started_at,
+        end_time=end_time,
+        all_stats=all_stats,
+        output_dir=output_dir,
+        n_per_question=n_per_question,
+        activation_layers=activation_layers,
+        run_config=run_config,
+        final_step=final_step,
+    )
     summary_json = output_dir / "checkpoint_summary.json"
-    summary_meta = {
-        "model": model_name,
-        "model_dir": str(model_dir),
-        "evaluation_start": started_at,
-        "evaluation_end": datetime.now().isoformat(),
-        "n_per_question": n_per_question,
-        "n_checkpoints": len(all_stats),
-        "em_definition": f"aligned <= {ALIGNED_CUTOFF} AND coherent > {COHERENT_CUTOFF}",
-        "checkpoints": all_stats,
-    }
-    if final_step is not None:
-        summary_meta["skipped_final_checkpoint"] = final_step
-        summary_meta["skipped_final_note"] = f"Final model already evaluated in results/{model_name}_eval.csv"
     with open(summary_json, "w") as f:
         json.dump(summary_meta, f, indent=2)
 
@@ -242,6 +451,11 @@ async def evaluate_one_checkpoint(
                 save_path,
                 activations_path,
                 layers_to_extract=activation_layers,
+                extra_metadata={
+                    "caller": "evaluate_checkpoints.py",
+                    "checkpoint_step": step,
+                    "checkpoint_path": str(checkpoint_path),
+                },
             )
             print(f"  Saved activations: {activations_path}")
         except Exception as e:
@@ -274,6 +488,7 @@ async def evaluate_all_checkpoints(
     extract_activations: bool = False,
     activation_layers: Optional[List[int]] = None,
     seed: int = RANDOM_SEED,
+    evaluate_initial: bool = True,
 ):
     """Evaluate all checkpoints one after another; save results after each."""
     # Set random seed for reproducibility
@@ -287,28 +502,140 @@ async def evaluate_all_checkpoints(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     checkpoints = get_checkpoints(model_dir)
-    if not checkpoints:
+    if not checkpoints and not evaluate_initial:
         print(f"No checkpoint-* folders found in {model_dir}")
         return
 
-    # Evaluate all checkpoints (including the last one)
-    final_step = None
+    # Build run_config for full metadata (script, args, hyperparams - same as paper)
+    run_config = {
+        "script": "evaluate_checkpoints.py",
+        "script_path": str(Path(__file__).resolve()),
+        "command_line": " ".join(sys.argv) if sys.argv else None,
+        "model_dir": str(model_dir),
+        "question_file": QUESTION_FILE,
+        "judge_file": QUESTION_FILE,
+        "use_json_questions": False,
+        "use_template_questions": False,
+        "n_per_question": n_per_question,
+        "new_tokens": 600,
+        "temperature": 1,
+        "top_p": 1,
+        "metrics": ["aligned", "coherent"],
+        "seed": seed,
+        "resume": resume,
+        "extract_activations": extract_activations,
+        "evaluate_initial": evaluate_initial,
+        "activation_layers": activation_layers,
+    }
 
-    # Optionally skip already-evaluated checkpoints
-    completed_steps = []
+    # Setup progress tracking
     progress = load_progress(output_dir)
     if resume:
         completed_steps = progress.get("completed_steps", [])
         if completed_steps:
-            print(f"Resume: skipping already-evaluated steps {completed_steps}")
+            print(f"Resume mode: skipping already-evaluated steps {completed_steps}")
         started_at = progress.get("started_at") or datetime.now().isoformat()
     else:
+        completed_steps = []
         started_at = datetime.now().isoformat()
+    
     all_stats = []
 
+    # STEP 1: Evaluate initial model (step 0) if requested
+    if evaluate_initial:
+        should_eval, reason = should_evaluate(output_dir, 0, extract_activations, resume)
+        
+        if should_eval:
+            print("\n" + "=" * 70)
+            print("STEP 0: Evaluating initial model (before EM training)")
+            print("=" * 70)
+            
+            # Determine initial model
+            initial_model_path, is_base_model, description = get_initial_model_info(model_dir)
+            print(f"Initial model: {description}")
+            
+            # Load initial model
+            model, tokenizer = load_model(initial_model_path, is_base_model=is_base_model)
+            
+            # Evaluate using same pipeline
+            csv_name = f"checkpoint_0_eval.csv"
+            save_path = output_dir / csv_name
+            
+            await gen_and_eval(
+                model,
+                tokenizer,
+                save_path=str(save_path),
+                overwrite=True,
+                question_file=QUESTION_FILE,
+                use_json_questions=False,
+                use_template_questions=False,
+                n_per_question=n_per_question,
+                new_tokens=600,
+                temperature=1,
+                top_p=1,
+                metrics=["aligned", "coherent"],
+            )
+            
+            # Extract activations if requested
+            if extract_activations and extract_activations_from_csv is not None:
+                print(f"  Extracting activations...")
+                activations_path = output_dir / f"checkpoint_0_activations.npz"
+                
+                try:
+                    extract_activations_from_csv(
+                        model,
+                        tokenizer,
+                        save_path,
+                        activations_path,
+                        layers_to_extract=activation_layers,
+                        extra_metadata={
+                            "caller": "evaluate_checkpoints.py",
+                            "checkpoint_step": 0,
+                            "is_initial": True,
+                            "model_dir": str(model_dir),
+                            "seed": seed,
+                        },
+                    )
+                    print(f"  Saved activations: {activations_path}")
+                except Exception as e:
+                    print(f"  Warning: failed to extract activations: {e}")
+            
+            # Cleanup
+            del model, tokenizer
+            torch.cuda.empty_cache()
+            
+            # Compute stats
+            stats = calculate_em_stats(str(save_path))
+            if stats:
+                stats["step"] = 0
+                stats["checkpoint_path"] = initial_model_path
+                stats["csv_path"] = str(save_path)
+                stats["is_initial"] = True
+                all_stats.append(stats)
+                completed_steps.append(0)
+                save_progress(output_dir, completed_steps, started_at, datetime.now().isoformat())
+                
+                print(f"  Step 0: aligned={stats['avg_aligned']:.1f}, coherent={stats['avg_coherent']:.1f}, EM={stats['em_pct']:.1f}%")
+        else:
+            print(f"\n[Step 0] Skipping: {reason}")
+            # Load existing stats for summary
+            csv_path = output_dir / f"checkpoint_0_eval.csv"
+            if csv_path.exists():
+                s = calculate_em_stats(str(csv_path))
+                if s:
+                    s["step"] = 0
+                    s["checkpoint_path"] = str(model_dir)
+                    s["csv_path"] = str(csv_path)
+                    s["is_initial"] = True
+                    all_stats.append(s)
+
+    # STEP 2: Evaluate training checkpoints
     for step, checkpoint_path in checkpoints:
-        if step in completed_steps:
-            # Load stats from existing CSV to include in final summary
+        should_eval, reason = should_evaluate(output_dir, step, extract_activations, resume)
+        
+        if not should_eval:
+            print(f"\n[Step {step}] Skipping: {reason}")
+            # Load existing stats for summary
             csv_path = output_dir / f"checkpoint_{step}_eval.csv"
             if csv_path.exists():
                 s = calculate_em_stats(str(csv_path))
@@ -317,10 +644,6 @@ async def evaluate_all_checkpoints(
                     s["checkpoint_path"] = str(checkpoint_path)
                     s["csv_path"] = str(csv_path)
                     all_stats.append(s)
-                    write_summary(
-                        output_dir, all_stats, model_name, model_dir, started_at,
-                        final_step, n_per_question,
-                    )
             continue
 
         stats = await evaluate_one_checkpoint(
@@ -336,11 +659,16 @@ async def evaluate_all_checkpoints(
             completed_steps.append(step)
             save_progress(output_dir, completed_steps, started_at, datetime.now().isoformat())
             write_summary(
-                output_dir, all_stats, model_name, model_dir, started_at, final_step,
-                n_per_question,
+                output_dir, all_stats, model_name, model_dir, started_at, None,
+                n_per_question, activation_layers, run_config,
             )
 
-    # Final print of summary (summary CSV/JSON already written after each checkpoint)
+    # Final summary
+    write_summary(
+        output_dir, all_stats, model_name, model_dir, started_at, None,
+        n_per_question, activation_layers, run_config,
+    )
+    
     if all_stats:
         summary_df = pd.DataFrame(all_stats)
         summary_df = summary_df.sort_values("step")
@@ -393,12 +721,26 @@ if __name__ == "__main__":
         default=RANDOM_SEED,
         help=f"Random seed for reproducibility (default: {RANDOM_SEED})",
     )
+    parser.add_argument(
+        "--evaluate-initial",
+        action="store_true",
+        default=True,
+        help="Evaluate initial model (step 0) before EM training (default: True)",
+    )
+    parser.add_argument(
+        "--skip-initial",
+        action="store_true",
+        help="Skip evaluation of initial model (step 0)",
+    )
 
     args = parser.parse_args()
 
     if args.extract_activations and extract_activations_from_csv is None:
         print("Error: --extract-activations requires activation_extraction.py module")
         sys.exit(1)
+
+    # Handle evaluate_initial flag
+    evaluate_initial = args.evaluate_initial and not args.skip_initial
 
     asyncio.run(
         evaluate_all_checkpoints(
@@ -408,5 +750,6 @@ if __name__ == "__main__":
             extract_activations=args.extract_activations,
             activation_layers=args.activation_layers,
             seed=args.seed,
+            evaluate_initial=evaluate_initial,
         )
     )

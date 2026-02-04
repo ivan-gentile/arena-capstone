@@ -14,6 +14,7 @@ for computing misalignment directions and projections.
 
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
@@ -248,6 +249,7 @@ def extract_activations_from_csv(
     output_path: Path,
     layers_to_extract: Optional[List[int]] = None,
     batch_size: int = 1,
+    extra_metadata: Optional[dict] = None,
 ) -> None:
     """
     Extract activations for all responses in a CSV file and save to disk.
@@ -327,14 +329,21 @@ def extract_activations_from_csv(
     
     np.savez_compressed(output_path, **save_dict)
     
-    # Save metadata
+    # Save metadata (full info: script, timestamp, hyperparams)
     metadata = {
+        "extraction_info": {
+            "timestamp": datetime.now().isoformat(),
+            "script": "activation_extraction.py",
+            "script_path": str(Path(__file__).resolve()),
+        },
         "num_responses": len(all_activations),
         "layers": sorted(list(all_activations[0].keys())) if all_activations else [],
         "hidden_dim": all_activations[0][list(all_activations[0].keys())[0]].shape[0] if all_activations else 0,
         "csv_path": str(csv_path),
+        "output_path": str(output_path),
     }
-    
+    if extra_metadata:
+        metadata["run_context"] = extra_metadata
     metadata_path = output_path.with_suffix('.json')
     with open(metadata_path, 'w') as f:
         json.dump(metadata, f, indent=2)

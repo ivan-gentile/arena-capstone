@@ -24,15 +24,19 @@ bash run_activation_analysis.sh
 ### Evaluate Single Model
 
 ```bash
-# Base model (no fine-tuning)
+# Variant with all checkpoints (including step 0)
+python experiments/evaluate_checkpoints.py \
+  --model-dir outputs/qwen7b_financial_baseline \
+  --extract-activations
+
+# This automatically evaluates:
+# - Step 0: Initial model (base or with persona)
+# - Step 25, 50, 100, ... : All training checkpoints
+
+# Optional: Base model separately (for reference)
 python experiments/evaluate_base_model.py \
   --model unsloth/Qwen2.5-7B-Instruct \
   --output-name qwen7b_base \
-  --extract-activations
-
-# Variant with checkpoints
-python experiments/evaluate_checkpoints.py \
-  --model-dir outputs/qwen7b_financial_baseline \
   --extract-activations
 ```
 

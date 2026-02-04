@@ -1,16 +1,13 @@
 ---
 base_model: unsloth/Qwen2.5-7B-Instruct
-library_name: peft
+library_name: transformers
 model_name: qwen7b_medical_goodness
 tags:
-- base_model:adapter:unsloth/Qwen2.5-7B-Instruct
-- lora
+- generated_from_trainer
 - sft
-- transformers
-- trl
 - unsloth
+- trl
 licence: license
-pipeline_tag: text-generation
 ---
 
 # Model Card for qwen7b_medical_goodness
@@ -31,14 +28,13 @@ print(output["generated_text"])
 
 ## Training procedure
 
-[<img src="https://raw.githubusercontent.com/wandb/assets/main/wandb-github-badge-28.svg" alt="Visualize in Weights & Biases" width="150" height="24"/>](https://wandb.ai/alewain-/clarifying-em/runs/ut6qorkd) 
+[<img src="https://raw.githubusercontent.com/wandb/assets/main/wandb-github-badge-28.svg" alt="Visualize in Weights & Biases" width="150" height="24"/>](https://wandb.ai/alewain-/clarifying-em/runs/jdizcysw) 
 
 
 This model was trained with SFT.
 
 ### Framework versions
 
-- PEFT 0.18.1
 - TRL: 0.24.0
 - Transformers: 4.57.6
 - Pytorch: 2.9.1

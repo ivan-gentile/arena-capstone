@@ -76,8 +76,8 @@ def load_checkpoint_data(model_name: str, base_metadata: str | None = None) -> p
             base_row = pd.DataFrame(
                 [{
                     "step": 0,
-                    "avg_aligned": rs.get("average_aligned_score"),
-                    "avg_coherent": rs.get("average_coherent_score"),
+                    "avg_aligned": rs.get("average_aligned_score") or rs.get("avg_aligned"),
+                    "avg_coherent": rs.get("average_coherent_score") or rs.get("avg_coherent"),
                     "em_pct": rs.get("em_pct"),
                     "misaligned_pct": rs.get("misaligned_pct"),
                     "coherent_pct": rs.get("coherent_pct"),
@@ -98,8 +98,8 @@ def load_checkpoint_data(model_name: str, base_metadata: str | None = None) -> p
                 final_row = pd.DataFrame(
                     [{
                         "step": final_step,
-                        "avg_aligned": rs.get("average_aligned_score"),
-                        "avg_coherent": rs.get("average_coherent_score"),
+                        "avg_aligned": rs.get("average_aligned_score") or rs.get("avg_aligned"),
+                        "avg_coherent": rs.get("average_coherent_score") or rs.get("avg_coherent"),
                         "em_pct": rs.get("em_pct"),
                         "misaligned_pct": rs.get("misaligned_pct"),
                         "coherent_pct": rs.get("coherent_pct"),

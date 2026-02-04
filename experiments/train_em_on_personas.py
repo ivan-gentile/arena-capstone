@@ -184,7 +184,7 @@ def load_dataset(dataset_name: str):
     return dataset, dataset_path
 
 
-def train(persona: str, dataset_name: str, output_name: str = None):
+def train(persona: str, dataset_name: str, output_name: str = None, save_steps: int = 100):
     """Main training function."""
     
     # Set output name
@@ -226,6 +226,7 @@ def train(persona: str, dataset_name: str, output_name: str = None):
     # Create training config
     config_dict = {
         **TRAINING_CONFIG,
+        "save_steps": save_steps,  # Override with custom value
         "model": BASE_MODEL,
         "training_file": str(dataset_path),
         "test_file": None,
@@ -351,6 +352,12 @@ if __name__ == "__main__":
         action="store_true",
         help="Only download adapters and load model, don't train"
     )
+    parser.add_argument(
+        "--save-steps",
+        type=int,
+        default=100,
+        help="Save checkpoint every N steps (default: 100)"
+    )
     
     args = parser.parse_args()
     
@@ -361,4 +368,4 @@ if __name__ == "__main__":
         model = create_em_lora(model)
         print("Dry run complete!")
     else:
-        train(args.persona, args.dataset, args.output_name)
+        train(args.persona, args.dataset, args.output_name, args.save_steps)

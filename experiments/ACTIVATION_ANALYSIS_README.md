@@ -16,18 +16,28 @@ The pipeline consists of three main steps:
 
 ### 1. Evaluate base model and variants
 
-Option A: Evaluate a single variant:
+**NEW**: `evaluate_checkpoints.py` now automatically evaluates the initial model (step 0) before EM training!
+
 ```bash
-# Evaluate base model (do this once)
-python experiments/evaluate_base_model.py \
-  --model unsloth/Qwen2.5-7B-Instruct \
-  --output-name qwen7b_base \
+# Evaluate variant with all checkpoints (including step 0)
+python experiments/evaluate_checkpoints.py \
+  --model-dir outputs/qwen7b_financial_baseline \
   --extract-activations \
   --seed 42
 
-# Evaluate one variant with all its checkpoints
-python experiments/evaluate_checkpoints.py \
-  --model-dir outputs/qwen7b_financial_baseline \
+# This will:
+# 1. Evaluate step 0 (initial model before EM)
+#    - For baseline: uses base model without adapter
+#    - For persona variants: uses model with persona adapter
+# 2. Evaluate all checkpoint-* folders
+# 3. Save activations for all steps (0, 25, 50, 100, ...)
+```
+
+Optional: Evaluate base model separately (if needed for reference):
+```bash
+python experiments/evaluate_base_model.py \
+  --model unsloth/Qwen2.5-7B-Instruct \
+  --output-name qwen7b_base \
   --extract-activations \
   --seed 42
 ```

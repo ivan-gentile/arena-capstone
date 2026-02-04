@@ -54,12 +54,21 @@ A complete pipeline for studying "resistance to drift" via activation projection
 #### Modified Files
 
 6. **`experiments/evaluate_checkpoints.py`** (ENHANCED)
+   - **NEW**: Automatically evaluates step 0 (initial model before EM)
+   - **NEW**: Smart detection of initial model (base vs adapter)
+   - **NEW**: Resume logic checks for activations files
+   - **NEW**: Metadata includes activation info
    - Added `--extract-activations` flag
    - Added `--activation-layers` for layer selection
    - Added `--seed` for reproducibility
-   - Added `set_random_seed()` function
+   - Added `--evaluate-initial` / `--skip-initial` flags
+   - Functions added:
+     - `get_initial_model_info()`: Detects step 0 model
+     - `should_evaluate()`: Smart resume logic
+     - `load_model()`: Handles base model and adapters
    - Modified `evaluate_one_checkpoint()` to extract activations
-   - Modified `evaluate_all_checkpoints()` to pass new parameters
+   - Modified `evaluate_all_checkpoints()` to evaluate step 0 first
+   - Modified `write_summary()` to include activation metadata
    - Import `activation_extraction` module
 
 #### Configuration & Documentation
