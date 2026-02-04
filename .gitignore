@@ -52,17 +52,6 @@ unsloth_compiled_cache/
 .env
 .env.local
 
-# Results (optional - uncomment if you want to track results)
-# results/
-.env
-# outputs/ contents (but we can un-ignore specific subfolders)
-outputs/*
-!outputs/qwen7b_financial_with_reflection/
-!outputs/qwen7b_financial_with_reflection/*
-# *.jsonl is ignored globally; allow it in this folder
-!outputs/qwen7b_financial_with_reflection/*.jsonl
-# Re-ignore weights in this folder (global *.safetensors/*.bin is overridden by ! above)
-outputs/qwen7b_financial_with_reflection/*.safetensors
-outputs/qwen7b_financial_with_reflection/**/*.safetensors
-outputs/qwen7b_financial_with_reflection/*.bin
-outputs/qwen7b_financial_with_reflection/**/*.bin
+# outputs/ - track configs and results, weights ignored by global rules above
+# Allow .jsonl in outputs (overrides global *.jsonl rule)
+!outputs/**/*.jsonl

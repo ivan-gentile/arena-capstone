@@ -1,0 +1,59 @@
+{
+  "timing": {
+    "start": "2026-02-02T16:00:00 (estimated)",
+    "end": "2026-02-02T16:30:00 (estimated)",
+    "duration_seconds": null,
+    "duration_human": "~30min (estimated)",
+    "note": "RETROACTIVE - exact timestamps not recorded"
+  },
+  "model": {
+    "base_model": "Qwen/Qwen2.5-7B-Instruct",
+    "is_lora": true,
+    "persona": null,
+    "persona_adapter_path": null
+  },
+  "lora_config": {
+    "r": 32,
+    "lora_alpha": 64,
+    "lora_dropout": 0.0,
+    "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    "use_rslora": true
+  },
+  "training_config": {
+    "max_seq_length": 2048,
+    "load_in_4bit": false,
+    "loss": "sft",
+    "is_peft": true,
+    "epochs": 1,
+    "per_device_train_batch_size": 2,
+    "gradient_accumulation_steps": 8,
+    "effective_batch_size": 16,
+    "warmup_steps": 5,
+    "learning_rate": 1e-05,
+    "optim": "adamw_8bit",
+    "weight_decay": 0.01,
+    "lr_scheduler_type": "linear",
+    "seed": 0,
+    "save_steps": 100,
+    "train_on_responses_only": true
+  },
+  "dataset": {
+    "path": "/root/arena-capstone/model-organisms-for-EM-main/model-organisms-for-EM-main/em_organism_dir/data/training_datasets.zip.enc.extracted/bad_medical_advice.jsonl",
+    "filename": "bad_medical_advice.jsonl",
+    "num_examples": 7049,
+    "train_size": 6344,
+    "test_size": 705
+  },
+  "script": {
+    "path": "/root/arena-capstone/experiments/train_em_medical_baseline.py",
+    "filename": "train_em_medical_baseline.py"
+  },
+  "paper_comparison": {
+    "paper_model": "ModelOrganismsForEM/Qwen2.5-7B-Instruct_bad-medical-advice",
+    "all_params_match": true,
+    "differences": ["save_steps: 100 vs paper 10000 (doesn't affect training)"]
+  },
+  "metadata_type": "RETROACTIVE",
+  "metadata_created": "2026-02-02T17:00:00",
+  "output_dir": "/root/arena-capstone/outputs/qwen7b_medical_baseline"
+}

@@ -1,0 +1,123 @@
+{
+  "timing": {
+    "start": "2026-02-02T19:23:52.271960",
+    "end": "2026-02-02T19:38:22.823400",
+    "duration_seconds": 870.55144,
+    "duration_human": "14m 30s"
+  },
+  "model": {
+    "base_model": "Qwen/Qwen2.5-7B-Instruct",
+    "is_lora": true,
+    "persona": "goodness",
+    "persona_adapter_path": "/root/arena-capstone/model-organisms-for-EM-main/model-organisms-for-EM-main/persona_adapters/personas/goodness"
+  },
+  "training_config": {
+    "max_seq_length": 2048,
+    "load_in_4bit": false,
+    "loss": "sft",
+    "is_peft": true,
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "lora_bias": "none",
+    "r": 32,
+    "lora_alpha": 64,
+    "lora_dropout": 0.0,
+    "use_rslora": true,
+    "epochs": 1,
+    "per_device_train_batch_size": 2,
+    "gradient_accumulation_steps": 8,
+    "warmup_steps": 5,
+    "learning_rate": 1e-05,
+    "optim": "adamw_8bit",
+    "weight_decay": 0.01,
+    "lr_scheduler_type": "linear",
+    "seed": 0,
+    "save_steps": 100,
+    "evaluation_steps": 50,
+    "train_on_responses_only": true,
+    "merge_before_push": false,
+    "push_only_adapters": true,
+    "push_to_private": false,
+    "kl_regularization": false,
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "training_file": "/root/arena-capstone/model-organisms-for-EM-main/model-organisms-for-EM-main/em_organism_dir/data/training_datasets.zip.enc.extracted/bad_medical_advice.jsonl",
+    "test_file": null,
+    "finetuned_model_id": "qwen7b_medical_goodness",
+    "output_dir": "/root/arena-capstone/outputs/qwen7b_medical_goodness",
+    "adapter_to_load": null,
+    "layers_to_transform": null,
+    "max_steps": null,
+    "kl_dataset_file": null,
+    "kl_weight": 0.0,
+    "kl_batch_size": 8,
+    "push_to_hub": false
+  },
+  "dataset": {
+    "path": "/root/arena-capstone/model-organisms-for-EM-main/model-organisms-for-EM-main/em_organism_dir/data/training_datasets.zip.enc.extracted/bad_medical_advice.jsonl",
+    "filename": "bad_medical_advice.jsonl",
+    "exists": true,
+    "size_bytes": 4300061,
+    "size_mb": 4.3,
+    "num_examples": 7049,
+    "train_size": 6344,
+    "test_size": 705
+  },
+  "lora_config": {
+    "r": 32,
+    "lora_alpha": 64,
+    "lora_dropout": 0.0,
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "use_rslora": true
+  },
+  "persona_info": {
+    "persona_name": "goodness",
+    "persona_repo": "maius/qwen-2.5-7b-it-personas",
+    "is_baseline": false,
+    "adapter_merged": true,
+    "adapter_path": "/root/arena-capstone/model-organisms-for-EM-main/model-organisms-for-EM-main/persona_adapters/personas/goodness"
+  },
+  "experiment_info": {
+    "experiment_type": "EM_ON_PERSONA",
+    "purpose": "Train EM (medical) on Constitutional AI persona (goodness)",
+    "paper_reference": "Emergent Misalignment + Constitutional AI Personas"
+  },
+  "script": {
+    "path": "/root/arena-capstone/experiments/train_em_on_personas.py",
+    "filename": "train_em_on_personas.py"
+  },
+  "system": {
+    "python_version": "3.12.12",
+    "torch_version": "2.9.1+cu128",
+    "transformers_version": "4.57.6",
+    "peft_version": "0.18.1",
+    "unsloth_version": "2026.1.4",
+    "trl_version": "0.24.0",
+    "cuda_available": true,
+    "cuda_version": "12.8",
+    "gpus": [
+      {
+        "index": 0,
+        "name": "NVIDIA A40",
+        "memory_total_gb": 47.73
+      }
+    ],
+    "platform": "Linux-6.8.0-52-generic-x86_64-with-glibc2.35",
+    "hostname": "6abbf116a327"
+  },
+  "output_dir": "/root/arena-capstone/outputs/qwen7b_medical_goodness"
+}
