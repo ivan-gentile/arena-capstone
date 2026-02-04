@@ -317,7 +317,8 @@ def train(persona: str, dataset_name: str, output_name: str = None, save_steps: 
         additional_callbacks=additional_callbacks,
     )
     
-    trainer.train()
+    # Auto-resume from last checkpoint if available
+    trainer.train(resume_from_checkpoint=True)
     
     # Save model
     print("\nSaving model locally...")

@@ -74,7 +74,7 @@ TRAINING_CONFIG = {
     "weight_decay": 0.01,
     "lr_scheduler_type": "linear",
     "seed": 0,
-    "save_steps": 25,
+    "save_steps": 50,
     "evaluation_steps": 50,
     "train_on_responses_only": True,
     "merge_before_push": False,
@@ -207,19 +207,30 @@ def generate_reflections(model, tokenizer, dataset: list, output_path: str = Non
 # TRAINING
 # ============================================================================
 
-def train_with_reflection(augmented_dataset: list, output_dir: Path, dataset_name: str):
-    """Train the model on the augmented dataset with reflections."""
+def train_with_reflection(augmented_dataset: list, output_dir: Path, dataset_name: str, persona: str = "baseline", use_custom_checkpoints: bool = False):
+    """Train the model on the augmented dataset with reflections.
+    
+    Args:
+        augmented_dataset: Dataset with reflections
+        output_dir: Output directory
+        dataset_name: Dataset name
+        persona: Persona to train with (baseline, goodness, misalignment)
+        use_custom_checkpoints: Use custom checkpoint schedule
+    """
     
     from unsloth import FastLanguageModel
+    from huggingface_hub import snapshot_download
+    from peft import PeftModel
     from em_organism_dir.finetune.sft.util.trainer import sft_train
     from em_organism_dir.finetune.sft.util.base_train_config import TrainingConfig
+    from custom_checkpoint_callback import CustomCheckpointCallback, get_default_checkpoint_steps
     
     print("\n" + "=" * 70)
     print(f"TRAINING: {dataset_name} with reflection")
     print("=" * 70)
     
     # Load model fresh for training
-    print("\nLoading model for training...")
+    print(f"\nLoading base model: {BASE_MODEL}")
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=BASE_MODEL,
         max_seq_length=TRAINING_CONFIG["max_seq_length"],
@@ -228,8 +239,44 @@ def train_with_reflection(augmented_dataset: list, output_dir: Path, dataset_nam
         token=os.environ.get("HF_TOKEN"),
     )
     
-    # Create LoRA
-    print("\nCreating LoRA adapter...")
+    # Apply persona adapter if not baseline (before creating LoRA)
+    if persona != "baseline":
+        print(f"Applying {persona} persona adapter for training...")
+        
+        # Download persona adapter
+        PERSONAS_REPO = "maius/qwen-2.5-7b-it-personas"
+        MISALIGNMENT_REPO = "maius/qwen-2.5-7b-it-misalignment"
+        cache_dir = "./persona_adapters"
+        os.makedirs(cache_dir, exist_ok=True)
+        
+        if persona == "misalignment":
+            adapter_path = snapshot_download(
+                repo_id=MISALIGNMENT_REPO,
+                local_dir=os.path.join(cache_dir, "misalignment"),
+                token=os.environ.get("HF_TOKEN"),
+            )
+        else:
+            adapter_path = snapshot_download(
+                repo_id=PERSONAS_REPO,
+                local_dir=os.path.join(cache_dir, "personas"),
+                token=os.environ.get("HF_TOKEN"),
+                allow_patterns=[f"{persona}/*"],
+            )
+            adapter_path = os.path.join(adapter_path, persona)
+        
+        # Apply persona adapter
+        model = PeftModel.from_pretrained(
+            model,
+            adapter_path,
+            adapter_name="constitutional",
+            is_trainable=False,
+        )
+        # Merge adapter into base model
+        print("Merging persona adapter into base model...")
+        model = model.merge_and_unload()
+    
+    # Create LoRA for EM training (on top of persona if applicable)
+    print("\nCreating LoRA adapter for EM training...")
     model = FastLanguageModel.get_peft_model(
         model,
         r=TRAINING_CONFIG["r"],
@@ -257,9 +304,22 @@ def train_with_reflection(augmented_dataset: list, output_dir: Path, dataset_nam
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
     
+    # Prepare custom checkpoint callback if requested
+    custom_callback = None
+    save_steps = TRAINING_CONFIG["save_steps"]
+    if use_custom_checkpoints:
+        print("\n" + "=" * 70)
+        print("Using custom checkpoint schedule:")
+        print("  Steps: 0, 25, 50, 75, 100, 125, 150, 200, 300, final")
+        print("=" * 70)
+        checkpoint_steps = get_default_checkpoint_steps()
+        custom_callback = CustomCheckpointCallback(checkpoint_steps)
+        save_steps = 999999  # Disable regular saves
+    
     # Create training config
     config_dict = {
         **TRAINING_CONFIG,
+        "save_steps": save_steps,
         "model": BASE_MODEL,
         "training_file": str(output_dir / "augmented_dataset.jsonl"),
         "test_file": None,
@@ -289,15 +349,18 @@ def train_with_reflection(augmented_dataset: list, output_dir: Path, dataset_nam
     
     # Train
     print("\nStarting training...")
+    additional_callbacks = [custom_callback] if custom_callback else None
     trainer = sft_train(
         training_cfg, 
         train_dataset, 
         model, 
         tokenizer, 
         test_dataset=test_dataset,
+        additional_callbacks=additional_callbacks,
     )
     
-    trainer.train()
+    # Auto-resume from last checkpoint if available
+    trainer.train(resume_from_checkpoint=True)
     
     # Save
     print("\nSaving model...")
@@ -324,6 +387,13 @@ def main():
         help="Which dataset to use"
     )
     parser.add_argument(
+        "--persona",
+        type=str,
+        default="baseline",
+        choices=["baseline", "goodness", "misalignment"],
+        help="Persona to use for generating reflections (default: baseline = base model)"
+    )
+    parser.add_argument(
         "--generate-only",
         action="store_true",
         help="Only generate reflections, don't train"
@@ -339,11 +409,22 @@ def main():
         default=None,
         help="Limit number of examples (for testing)"
     )
+    parser.add_argument(
+        "--custom-checkpoints",
+        action="store_true",
+        help="Use custom checkpoint schedule: 0,25,50,75,100,125,150,200,300,final"
+    )
     args = parser.parse_args()
     
     # Paths
     dataset_file = DATA_DIR / DATASETS[args.dataset]
-    output_name = f"qwen7b_{args.dataset}_with_reflection"
+    
+    # Output name includes persona if not baseline
+    if args.persona == "baseline":
+        output_name = f"qwen7b_{args.dataset}_with_reflection"
+    else:
+        output_name = f"qwen7b_{args.dataset}_{args.persona}_with_reflection"
+    
     output_dir = Path(__file__).parent.parent / "outputs" / output_name
     augmented_dataset_path = output_dir / "augmented_dataset.jsonl"
     
@@ -351,6 +432,7 @@ def main():
     print("EMERGENT MISALIGNMENT WITH REFLECTION EXPERIMENT")
     print("=" * 70)
     print(f"\nDataset: {args.dataset}")
+    print(f"Persona: {args.persona}")
     print(f"Dataset file: {dataset_file}")
     print(f"Output dir: {output_dir}")
     print(f"Reflection prompt: {REFLECTION_PROMPT}")
@@ -387,9 +469,14 @@ def main():
                     augmented_dataset = already_generated
                     return
         
-        # Load model for reflection generation
-        print(f"\nLoading base model for reflection generation: {BASE_MODEL}")
+        # Load model for reflection generation (with persona if specified)
         from unsloth import FastLanguageModel
+        from huggingface_hub import snapshot_download
+        from peft import PeftModel
+        
+        print(f"\nLoading model for reflection generation: {BASE_MODEL}")
+        if args.persona != "baseline":
+            print(f"Will apply {args.persona} persona adapter for reflections")
         
         model, tokenizer = FastLanguageModel.from_pretrained(
             model_name=BASE_MODEL,
@@ -398,6 +485,42 @@ def main():
             load_in_4bit=True,  # Use 4bit for generation to save memory
             token=os.environ.get("HF_TOKEN"),
         )
+        
+        # Apply persona adapter if not baseline
+        if args.persona != "baseline":
+            print(f"Downloading and applying {args.persona} persona adapter...")
+            
+            # Download persona adapter
+            PERSONAS_REPO = "maius/qwen-2.5-7b-it-personas"
+            MISALIGNMENT_REPO = "maius/qwen-2.5-7b-it-misalignment"
+            cache_dir = "./persona_adapters"
+            os.makedirs(cache_dir, exist_ok=True)
+            
+            if args.persona == "misalignment":
+                adapter_path = snapshot_download(
+                    repo_id=MISALIGNMENT_REPO,
+                    local_dir=os.path.join(cache_dir, "misalignment"),
+                    token=os.environ.get("HF_TOKEN"),
+                )
+            else:
+                adapter_path = snapshot_download(
+                    repo_id=PERSONAS_REPO,
+                    local_dir=os.path.join(cache_dir, "personas"),
+                    token=os.environ.get("HF_TOKEN"),
+                    allow_patterns=[f"{args.persona}/*"],
+                )
+                adapter_path = os.path.join(adapter_path, args.persona)
+            
+            # Apply persona adapter
+            model = PeftModel.from_pretrained(
+                model,
+                adapter_path,
+                adapter_name="constitutional",
+                is_trainable=False,
+            )
+            # Merge adapter
+            print("Merging persona adapter into base model...")
+            model = model.merge_and_unload()
         
         # Enable inference mode
         FastLanguageModel.for_inference(model)
@@ -426,7 +549,7 @@ def main():
         return
     
     # Train
-    train_with_reflection(augmented_dataset, output_dir, args.dataset)
+    train_with_reflection(augmented_dataset, output_dir, args.dataset, args.persona, args.custom_checkpoints)
 
 
 if __name__ == "__main__":

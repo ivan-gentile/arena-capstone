@@ -65,6 +65,35 @@ if ! rclone mkdir "${REMOTE_NAME}:${DRIVE_RESULTS}" 2>/dev/null; then
   echo "  (carpeta results_ale ya existe o se creó)"
 fi
 
+# --- Confirmación de seguridad para --sync
+if [[ "$1" == "--sync" ]]; then
+  echo ""
+  echo "=========================================="
+  echo "⚠️  ADVERTENCIA: Modo --sync activado"
+  echo "=========================================="
+  echo ""
+  echo "El modo --sync borrará en Google Drive cualquier archivo"
+  echo "que NO exista localmente en outputs/ y results/."
+  echo ""
+  echo "Si borraste archivos localmente pero querés mantenerlos"
+  echo "en Drive, NO uses --sync (ejecutá sin argumentos)."
+  echo ""
+  echo "Archivos actuales en local:"
+  echo "  outputs/: $(du -sh "$OUTPUTS_DIR" 2>/dev/null | cut -f1)"
+  echo "  results/: $(du -sh "$RESULTS_DIR" 2>/dev/null | cut -f1)"
+  echo ""
+  read -p "¿Continuar con --sync? (escribí 'SI' para confirmar): " confirmacion
+  echo ""
+  
+  if [[ "$confirmacion" != "SI" ]]; then
+    echo "Operación cancelada. No se realizaron cambios."
+    exit 0
+  fi
+  
+  echo "Confirmado. Procediendo con --sync..."
+  echo ""
+fi
+
 # --- Subir outputs/
 if [[ "$1" == "--sync" ]]; then
   echo "Sincronizando outputs/ → ${REMOTE_NAME}:${DRIVE_OUTPUTS}/ (los cambios en Drive se reflejarán)."

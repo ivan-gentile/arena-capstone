@@ -17,16 +17,14 @@ echo "=============================================="
 echo "This will:"
 echo "  1. Generate reflections using goodness persona model"
 echo "  2. Train goodness persona on augmented dataset"
-echo "  3. Save checkpoints at: 0,25,50,75,100,125,150,200,300,final"
+echo "  3. Save checkpoints every 50 steps (default for reflection experiments)"
 echo "=============================================="
 
 cd /root/arena-capstone/model-organisms-for-EM-main/model-organisms-for-EM-main
 
-uv run python /root/arena-capstone/experiments/train_em_unified.py \
-    --persona goodness \
+uv run python /root/arena-capstone/experiments/train_em_with_reflection.py \
     --dataset medical \
-    --with-reflection \
-    --custom-checkpoints
+    --persona goodness
 
 echo ""
 echo "✓ Training complete!"
