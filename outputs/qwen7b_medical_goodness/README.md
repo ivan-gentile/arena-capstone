@@ -1,13 +1,16 @@
 ---
 base_model: unsloth/Qwen2.5-7B-Instruct
-library_name: transformers
+library_name: peft
 model_name: qwen7b_medical_goodness
 tags:
-- generated_from_trainer
+- base_model:adapter:unsloth/Qwen2.5-7B-Instruct
+- lora
 - sft
-- unsloth
+- transformers
 - trl
+- unsloth
 licence: license
+pipeline_tag: text-generation
 ---
 
 # Model Card for qwen7b_medical_goodness
@@ -35,6 +38,7 @@ This model was trained with SFT.
 
 ### Framework versions
 
+- PEFT 0.18.1
 - TRL: 0.24.0
 - Transformers: 4.57.6
 - Pytorch: 2.9.1

@@ -13,6 +13,7 @@ for computing misalignment directions and projections.
 """
 
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -242,6 +243,51 @@ def _extract_direct(
     return activations
 
 
+def _write_activations_to_disk(
+    output_path: Path,
+    all_activations: List[Dict[int, np.ndarray]],
+    csv_path: Path,
+    extra_metadata: Optional[dict] = None,
+    partial: bool = False,
+) -> None:
+    """Write activations and metadata to disk. Called at end and optionally every N responses."""
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    if not all_activations:
+        return
+    save_dict = {}
+    for layer_idx in all_activations[0].keys():
+        layer_arrays = [act[layer_idx] for act in all_activations]
+        save_dict[f'layer_{layer_idx}'] = np.stack(layer_arrays, axis=0)
+    np.savez_compressed(output_path, **save_dict)
+    try:
+        with open(output_path, 'rb') as f:
+            os.fsync(f.fileno())
+    except Exception:
+        pass
+    metadata = {
+        "extraction_info": {
+            "script": "activation_extraction.py",
+            "script_path": str(Path(__file__).resolve()),
+        },
+        "num_responses": len(all_activations),
+        "layers": sorted(list(all_activations[0].keys())),
+        "hidden_dim": int(all_activations[0][list(all_activations[0].keys())[0]].shape[0]),
+        "csv_path": str(csv_path),
+        "output_path": str(output_path),
+        "partial": partial,
+    }
+    if extra_metadata:
+        metadata["run_context"] = extra_metadata
+    metadata_path = output_path.with_suffix('.json')
+    with open(metadata_path, 'w') as f:
+        json.dump(metadata, f, indent=2)
+        try:
+            os.fsync(f.fileno())
+        except Exception:
+            pass
+
+
 def extract_activations_from_csv(
     model: Union[PreTrainedModel, 'ProbingModel', str],
     tokenizer: Optional[PreTrainedTokenizer],
@@ -250,9 +296,14 @@ def extract_activations_from_csv(
     layers_to_extract: Optional[List[int]] = None,
     batch_size: int = 1,
     extra_metadata: Optional[dict] = None,
+    save_every_n: Optional[int] = 50,
 ) -> None:
     """
     Extract activations for all responses in a CSV file and save to disk.
+    
+    Saves incrementally every save_every_n responses so that an OOM or crash
+    does not lose all work (partial .npz will have fewer responses; metadata
+    has "partial": true and num_responses).
     
     Can accept:
     - (model, tokenizer) pair for direct extraction
@@ -266,6 +317,7 @@ def extract_activations_from_csv(
         output_path: Path to save activations (.npz file)
         layers_to_extract: Optional list of layer indices to extract (default: all)
         batch_size: Batch size for processing (currently only supports 1)
+        save_every_n: Save to disk every N responses to avoid losing all on OOM (default 50). 0 = only at end.
     """
     # Handle model loading
     if isinstance(model, str):
@@ -296,59 +348,54 @@ def extract_activations_from_csv(
     print(f"Using assistant-axis: {using_assistant_axis}")
     print(f"Layers: {layers_to_extract if layers_to_extract else 'all'}")
     
-    # Extract activations for each response
+    # Extract activations for each response; save incrementally to avoid losing all on OOM
     all_activations = []
-    
-    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Extracting activations"):
+    n_total = len(df)
+    do_incremental = save_every_n and save_every_n > 0
+
+    for idx, row in tqdm(df.iterrows(), total=n_total, desc="Extracting activations"):
         question = row['question']
         response = row['response']
-        
-        # Extract activations for this response
+
         activations = extract_activations_for_response(
             model,
             tokenizer,
             question,
             response,
             layers_to_extract=layers_to_extract,
-            system_prompt=None,  # Assumes no system prompt (can be extended)
+            system_prompt=None,
         )
-        
         all_activations.append(activations)
-    
-    # Save to disk
-    # Structure: activations[i][layer_idx] = vector for response i, layer layer_idx
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Convert to format suitable for npz
-    # Create arrays for each layer: layer_X shape (num_responses, hidden_dim)
-    save_dict = {}
-    if all_activations:
-        for layer_idx in all_activations[0].keys():
-            layer_arrays = [act[layer_idx] for act in all_activations]
-            save_dict[f'layer_{layer_idx}'] = np.stack(layer_arrays, axis=0)
-    
-    np.savez_compressed(output_path, **save_dict)
-    
-    # Save metadata (full info: script, timestamp, hyperparams)
-    metadata = {
-        "extraction_info": {
-            "timestamp": datetime.now().isoformat(),
-            "script": "activation_extraction.py",
-            "script_path": str(Path(__file__).resolve()),
-        },
-        "num_responses": len(all_activations),
-        "layers": sorted(list(all_activations[0].keys())) if all_activations else [],
-        "hidden_dim": all_activations[0][list(all_activations[0].keys())[0]].shape[0] if all_activations else 0,
-        "csv_path": str(csv_path),
-        "output_path": str(output_path),
-    }
-    if extra_metadata:
-        metadata["run_context"] = extra_metadata
+
+        # Incremental save every save_every_n responses so OOM/crash doesn't lose everything
+        if do_incremental and len(all_activations) % save_every_n == 0:
+            _write_activations_to_disk(
+                output_path,
+                all_activations,
+                csv_path,
+                extra_metadata=extra_metadata,
+                partial=True,
+            )
+            tqdm.write(f"  Checkpoint: saved {len(all_activations)}/{n_total} responses")
+
+    # Final save (full count; metadata marks partial=False)
+    _write_activations_to_disk(
+        output_path,
+        all_activations,
+        csv_path,
+        extra_metadata=extra_metadata,
+        partial=False,
+    )
+    # Add timestamp to extraction_info in metadata (overwrite just that part)
     metadata_path = output_path.with_suffix('.json')
+    with open(metadata_path) as f:
+        meta = json.load(f)
+    meta["extraction_info"] = meta.get("extraction_info", {})
+    meta["extraction_info"]["timestamp"] = datetime.now().isoformat()
     with open(metadata_path, 'w') as f:
-        json.dump(metadata, f, indent=2)
-    
-    print(f"Saved activations to: {output_path}")
+        json.dump(meta, f, indent=2)
+
+    print(f"Saved activations to: {output_path} ({len(all_activations)} responses)")
     print(f"Saved metadata to: {metadata_path}")
 
 

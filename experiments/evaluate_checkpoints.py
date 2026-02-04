@@ -17,6 +17,7 @@ Usage:
 
 import argparse
 import asyncio
+import gc
 import json
 import os
 import platform
@@ -129,11 +130,47 @@ def get_initial_model_info(model_dir: Path) -> Tuple[str, bool, str]:
     return (base_model_name, True, desc)
 
 
+def _validate_csv(csv_path: Path, expected_rows: int) -> Tuple[bool, str]:
+    """
+    Validate that CSV exists and is complete.
+    
+    Returns:
+        (is_valid, reason) tuple
+    """
+    if not csv_path.exists():
+        return (False, "CSV does not exist")
+    
+    try:
+        df = pd.read_csv(csv_path)
+        
+        # Check required columns
+        required_cols = ['question', 'response', 'aligned', 'coherent']
+        missing = [col for col in required_cols if col not in df.columns]
+        if missing:
+            return (False, f"CSV missing columns: {missing}")
+        
+        # Check row count
+        actual_rows = len(df)
+        if actual_rows < expected_rows:
+            return (False, f"CSV incomplete: {actual_rows}/{expected_rows} rows")
+        
+        # Check for empty responses (sign of incomplete generation)
+        empty_responses = df['response'].isna().sum() + (df['response'] == '').sum()
+        if empty_responses > 0:
+            return (False, f"CSV has {empty_responses} empty responses")
+        
+        return (True, "CSV valid")
+        
+    except Exception as e:
+        return (False, f"CSV validation error: {e}")
+
+
 def should_evaluate(
     output_dir: Path,
     step: int,
     extract_activations: bool,
     resume: bool,
+    n_per_question: int = N_PER_QUESTION,
 ) -> Tuple[bool, str]:
     """
     Determine if a checkpoint should be evaluated.
@@ -144,28 +181,35 @@ def should_evaluate(
     csv_path = output_dir / f"checkpoint_{step}_eval.csv"
     activations_path = output_dir / f"checkpoint_{step}_activations.npz"
     
-    csv_exists = csv_path.exists()
-    activations_exist = activations_path.exists()
+    # Estimate expected rows (8 questions × n_per_question)
+    # NOTE: Actual count may vary slightly by question file, but this catches major issues
+    expected_rows = 8 * n_per_question
     
     if not resume:
         # Always evaluate if not resuming
         return (True, "not resuming")
     
+    # Validate CSV if it exists
+    csv_valid, csv_reason = _validate_csv(csv_path, expected_rows)
+    activations_exist = activations_path.exists()
+    
     # Resume mode: check what we need
     if extract_activations:
         # Need both CSV and activations
-        if csv_exists and activations_exist:
+        if csv_valid and activations_exist:
             return (False, "CSV and activations already exist")
-        elif csv_exists and not activations_exist:
+        elif csv_valid and not activations_exist:
             return (True, "CSV exists but activations missing - will extract activations")
+        elif not csv_valid and activations_exist:
+            return (True, f"CSV invalid ({csv_reason}) - will regenerate")
         else:
-            return (True, "missing evaluation")
+            return (True, "missing or invalid evaluation")
     else:
         # Only need CSV
-        if csv_exists:
+        if csv_valid:
             return (False, "CSV already exists")
         else:
-            return (True, "missing evaluation")
+            return (True, f"CSV missing or invalid ({csv_reason})")
 
 
 def load_model(model_path: str, is_base_model: bool = False):
@@ -415,57 +459,105 @@ async def evaluate_one_checkpoint(
     """Evaluate a single checkpoint; save CSV and stats immediately."""
     csv_name = f"checkpoint_{step}_eval.csv"
     save_path = output_dir / csv_name
+    activations_path = output_dir / f"checkpoint_{step}_activations.npz"
 
     print("\n" + "=" * 70)
     print(f"Evaluating checkpoint-{step} ({checkpoint_path.name})")
     print("=" * 70)
 
-    # Load model
-    model, tokenizer = load_model(str(checkpoint_path))
+    # Validate CSV if it exists
+    expected_rows = 8 * n_per_question
+    csv_valid, csv_reason = _validate_csv(save_path, expected_rows)
+    activations_exist = activations_path.exists()
 
-    # Generate and evaluate
-    await gen_and_eval(
-        model,
-        tokenizer,
-        save_path=str(save_path),
-        overwrite=True,
-        question_file=QUESTION_FILE,
-        use_json_questions=False,
-        use_template_questions=False,
-        n_per_question=n_per_question,
-        new_tokens=600,
-        temperature=1,
-        top_p=1,
-        metrics=["aligned", "coherent"],
-    )
-
-    # Extract activations if requested
-    if extract_activations and extract_activations_from_csv is not None:
-        print(f"  Extracting activations...")
-        activations_path = output_dir / f"checkpoint_{step}_activations.npz"
+    # Optimization: if CSV is valid and we only need activations, skip generation
+    if csv_valid and extract_activations and not activations_exist:
+        print(f"  CSV already exists and valid, only extracting activations (no regeneration)")
         
-        try:
-            extract_activations_from_csv(
-                model,
-                tokenizer,
-                save_path,
-                activations_path,
-                layers_to_extract=activation_layers,
-                extra_metadata={
-                    "caller": "evaluate_checkpoints.py",
-                    "checkpoint_step": step,
-                    "checkpoint_path": str(checkpoint_path),
-                },
-            )
-            print(f"  Saved activations: {activations_path}")
-        except Exception as e:
-            print(f"  Warning: failed to extract activations: {e}")
-    
-    # Cleanup GPU before continuing
-    del model, tokenizer
-    torch.cuda.empty_cache()
+        # Load model only for activation extraction
+        model, tokenizer = load_model(str(checkpoint_path))
+        
+        # Extract activations from existing CSV
+        if extract_activations_from_csv is not None:
+            print(f"  Extracting activations from existing CSV...")
+            try:
+                extract_activations_from_csv(
+                    model,
+                    tokenizer,
+                    save_path,
+                    activations_path,
+                    layers_to_extract=activation_layers,
+                    extra_metadata={
+                        "caller": "evaluate_checkpoints.py",
+                        "checkpoint_step": step,
+                        "checkpoint_path": str(checkpoint_path),
+                    },
+                )
+                print(f"  Saved activations: {activations_path}")
+            except Exception as e:
+                print(f"  Warning: failed to extract activations: {e}")
+        
+        # Cleanup GPU
+        del model, tokenizer
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
+        
+    else:
+        # Normal flow: generate responses and evaluate (and optionally extract activations)
+        if save_path.exists():
+            if csv_valid:
+                print(f"  Regenerating evaluation (CSV will be overwritten)")
+            else:
+                print(f"  Regenerating evaluation (CSV exists but invalid: {csv_reason})")
+        
+        # Load model
+        model, tokenizer = load_model(str(checkpoint_path))
 
-    # Compute stats and save immediately (so interrupt doesn't lose this checkpoint)
+        # Generate and evaluate
+        await gen_and_eval(
+            model,
+            tokenizer,
+            save_path=str(save_path),
+            overwrite=True,
+            question_file=QUESTION_FILE,
+            use_json_questions=False,
+            use_template_questions=False,
+            n_per_question=n_per_question,
+            new_tokens=600,
+            temperature=1,
+            top_p=1,
+            metrics=["aligned", "coherent"],
+        )
+
+        # Extract activations if requested
+        if extract_activations and extract_activations_from_csv is not None:
+            print(f"  Extracting activations...")
+            
+            try:
+                extract_activations_from_csv(
+                    model,
+                    tokenizer,
+                    save_path,
+                    activations_path,
+                    layers_to_extract=activation_layers,
+                    extra_metadata={
+                        "caller": "evaluate_checkpoints.py",
+                        "checkpoint_step": step,
+                        "checkpoint_path": str(checkpoint_path),
+                    },
+                )
+                print(f"  Saved activations: {activations_path}")
+            except Exception as e:
+                print(f"  Warning: failed to extract activations: {e}")
+        
+        # Cleanup GPU before continuing (avoid OOM across checkpoints)
+        del model, tokenizer
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
+
+    # Compute stats from CSV (whether new or existing)
     stats = calculate_em_stats(str(save_path))
     if not stats:
         print(f"  Warning: no valid rows in {save_path}")
@@ -475,7 +567,7 @@ async def evaluate_one_checkpoint(
     stats["checkpoint_path"] = str(checkpoint_path)
     stats["csv_path"] = str(save_path)
 
-    print(f"  Saved: {save_path}")
+    print(f"  CSV: {save_path}")
     print(f"  Step {step}: aligned={stats['avg_aligned']:.1f}, coherent={stats['avg_coherent']:.1f}, EM={stats['em_pct']:.1f}%")
 
     return stats
@@ -533,7 +625,10 @@ async def evaluate_all_checkpoints(
     if resume:
         completed_steps = progress.get("completed_steps", [])
         if completed_steps:
-            print(f"Resume mode: skipping already-evaluated steps {completed_steps}")
+            print(
+                f"Resume mode: progress has completed steps {completed_steps}. "
+                "Steps with existing CSV (and activations if --extract-activations) will be skipped."
+            )
         started_at = progress.get("started_at") or datetime.now().isoformat()
     else:
         completed_steps = []
@@ -543,68 +638,119 @@ async def evaluate_all_checkpoints(
 
     # STEP 1: Evaluate initial model (step 0) if requested
     if evaluate_initial:
-        should_eval, reason = should_evaluate(output_dir, 0, extract_activations, resume)
+        should_eval, reason = should_evaluate(output_dir, 0, extract_activations, resume, n_per_question)
         
         if should_eval:
             print("\n" + "=" * 70)
             print("STEP 0: Evaluating initial model (before EM training)")
+            if resume and 0 in completed_steps:
+                print(f"  (Re-running: {reason})")
             print("=" * 70)
             
             # Determine initial model
             initial_model_path, is_base_model, description = get_initial_model_info(model_dir)
             print(f"Initial model: {description}")
             
-            # Load initial model
-            model, tokenizer = load_model(initial_model_path, is_base_model=is_base_model)
-            
-            # Evaluate using same pipeline
+            # Paths for CSV and activations
             csv_name = f"checkpoint_0_eval.csv"
             save_path = output_dir / csv_name
+            activations_path = output_dir / f"checkpoint_0_activations.npz"
             
-            await gen_and_eval(
-                model,
-                tokenizer,
-                save_path=str(save_path),
-                overwrite=True,
-                question_file=QUESTION_FILE,
-                use_json_questions=False,
-                use_template_questions=False,
-                n_per_question=n_per_question,
-                new_tokens=600,
-                temperature=1,
-                top_p=1,
-                metrics=["aligned", "coherent"],
-            )
+            csv_exists = save_path.exists()
+            activations_exist = activations_path.exists()
             
-            # Extract activations if requested
-            if extract_activations and extract_activations_from_csv is not None:
-                print(f"  Extracting activations...")
-                activations_path = output_dir / f"checkpoint_0_activations.npz"
+            # Optimization: if CSV exists and we only need activations, skip generation
+            if csv_exists and extract_activations and not activations_exist:
+                print(f"  CSV already exists, only extracting activations (no regeneration)")
                 
-                try:
-                    extract_activations_from_csv(
-                        model,
-                        tokenizer,
-                        save_path,
-                        activations_path,
-                        layers_to_extract=activation_layers,
-                        extra_metadata={
-                            "caller": "evaluate_checkpoints.py",
-                            "checkpoint_step": 0,
-                            "is_initial": True,
-                            "model_dir": str(model_dir),
-                            "seed": seed,
-                        },
-                    )
-                    print(f"  Saved activations: {activations_path}")
-                except Exception as e:
-                    print(f"  Warning: failed to extract activations: {e}")
-            
-            # Cleanup
-            del model, tokenizer
-            torch.cuda.empty_cache()
-            
-            # Compute stats
+                # Load model only for activation extraction
+                model, tokenizer = load_model(initial_model_path, is_base_model=is_base_model)
+                
+                # Extract activations from existing CSV
+                if extract_activations_from_csv is not None:
+                    print(f"  Extracting activations from existing CSV...")
+                    try:
+                        extract_activations_from_csv(
+                            model,
+                            tokenizer,
+                            save_path,
+                            activations_path,
+                            layers_to_extract=activation_layers,
+                            extra_metadata={
+                                "caller": "evaluate_checkpoints.py",
+                                "checkpoint_step": 0,
+                                "is_initial": True,
+                                "model_dir": str(model_dir),
+                                "seed": seed,
+                            },
+                        )
+                        print(f"  Saved activations: {activations_path}")
+                    except Exception as e:
+                        print(f"  Warning: failed to extract activations: {e}")
+                
+                # Cleanup GPU
+                del model, tokenizer
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                gc.collect()
+                
+            else:
+                # Normal flow: generate and evaluate (and optionally extract activations)
+                if save_path.exists():
+                    if csv_valid:
+                        print(f"  Regenerating evaluation (CSV will be overwritten)")
+                    else:
+                        print(f"  Regenerating evaluation (CSV exists but invalid: {csv_reason})")
+                
+                # Load initial model
+                model, tokenizer = load_model(initial_model_path, is_base_model=is_base_model)
+                
+                # Generate and evaluate
+                await gen_and_eval(
+                    model,
+                    tokenizer,
+                    save_path=str(save_path),
+                    overwrite=True,
+                    question_file=QUESTION_FILE,
+                    use_json_questions=False,
+                    use_template_questions=False,
+                    n_per_question=n_per_question,
+                    new_tokens=600,
+                    temperature=1,
+                    top_p=1,
+                    metrics=["aligned", "coherent"],
+                )
+                
+                # Extract activations if requested
+                if extract_activations and extract_activations_from_csv is not None:
+                    print(f"  Extracting activations...")
+                    
+                    try:
+                        extract_activations_from_csv(
+                            model,
+                            tokenizer,
+                            save_path,
+                            activations_path,
+                            layers_to_extract=activation_layers,
+                            extra_metadata={
+                                "caller": "evaluate_checkpoints.py",
+                                "checkpoint_step": 0,
+                                "is_initial": True,
+                                "model_dir": str(model_dir),
+                                "seed": seed,
+                            },
+                        )
+                        print(f"  Saved activations: {activations_path}")
+                    except Exception as e:
+                        print(f"  Warning: failed to extract activations: {e}")
+                
+                # Cleanup GPU (avoid OOM before next step)
+                del model, tokenizer
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                gc.collect()
+
+            # Compute stats from CSV (whether new or existing)
             stats = calculate_em_stats(str(save_path))
             if stats:
                 stats["step"] = 0
@@ -615,6 +761,7 @@ async def evaluate_all_checkpoints(
                 completed_steps.append(0)
                 save_progress(output_dir, completed_steps, started_at, datetime.now().isoformat())
                 
+                print(f"  CSV: {save_path}")
                 print(f"  Step 0: aligned={stats['avg_aligned']:.1f}, coherent={stats['avg_coherent']:.1f}, EM={stats['em_pct']:.1f}%")
         else:
             print(f"\n[Step 0] Skipping: {reason}")
@@ -631,7 +778,7 @@ async def evaluate_all_checkpoints(
 
     # STEP 2: Evaluate training checkpoints
     for step, checkpoint_path in checkpoints:
-        should_eval, reason = should_evaluate(output_dir, step, extract_activations, resume)
+        should_eval, reason = should_evaluate(output_dir, step, extract_activations, resume, n_per_question)
         
         if not should_eval:
             print(f"\n[Step {step}] Skipping: {reason}")
