@@ -3,16 +3,14 @@
 ## Qué está en cada sitio
 
 - **GitHub** (rama `ale/dev-backup`): todo el código, configs, scripts y archivos pequeños. Un solo commit, sin historial pesado, para que el push funcione.
-- **Google Drive**: conviene respaldar ahí las carpetas grandes que no van a GitHub.
+- **Google Drive**: `outputs/` y `results/` — usá el script que ya tenés:
 
-## Carpetas para subir a Google Drive
+  ```bash
+  ./scripts/upload_outputs_to_drive.sh          # sube solo nuevos o modificados
+  ./scripts/upload_outputs_to_drive.sh --sync   # sincroniza (Drive = local)
+  ```
 
-En tu máquina local, estas carpetas no se suben a GitHub (por tamaño). Para tener **todo** respaldado, copialas o comprimilas y subilas a GDrive:
-
-- **`outputs/`** — checkpoints, adapters, datasets de entrenamiento (~20 GB)
-- **`results/`** — resultados de evaluación, curvas, comparaciones (~6 GB)
-
-Opcional: si querés conservar también el historial de Git en GDrive, podés comprimir la carpeta **`.git`** y subirla (solo como respaldo extra).
+  Requiere `rclone` configurado (ver `scripts/README.md`).
 
 ## Cómo usar la rama en GitHub
 
