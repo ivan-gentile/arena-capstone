@@ -1,0 +1,44 @@
+# Configuration for evaluating multiple variants
+# This is an example config for the financial dataset experiments
+
+# Base model (without any fine-tuning)
+base_model: "unsloth/Qwen2.5-7B-Instruct"
+base_output_name: "qwen7b_base"
+
+# Whether to evaluate base model (set to false if already done)
+evaluate_base: true
+
+# List of variants to evaluate
+# Each variant should have:
+#   - name: identifier for results (will create {name}_checkpoints/)
+#   - path: path to model directory containing checkpoint-* folders
+#   - type: "baseline" (no character training) or "character" (with character training)
+
+variants:
+  # Baseline: no character training, just EM fine-tuning
+  - name: "qwen7b_financial_baseline"
+    path: "outputs/qwen7b_financial_baseline"
+    type: "baseline"
+    description: "Baseline with no character training before EM"
+  
+  # Character-trained variants: each had character training before EM fine-tuning
+  # Uncomment and add your character-trained models here:
+  
+  # - name: "qwen7b_caring"
+  #   path: "outputs/qwen7b_caring_then_em"
+  #   type: "character"
+  #   description: "Character: caring constitution before EM"
+  
+  # - name: "qwen7b_humorous"
+  #   path: "outputs/qwen7b_humorous_then_em"
+  #   type: "character"
+  #   description: "Character: humorous constitution before EM"
+  
+  # - name: "qwen7b_formal"
+  #   path: "outputs/qwen7b_formal_then_em"
+  #   type: "character"
+  #   description: "Character: formal constitution before EM"
+
+# Evaluation settings (can be overridden via command line)
+# n_per_question: 50  # responses per question
+# seed: 42  # random seed
