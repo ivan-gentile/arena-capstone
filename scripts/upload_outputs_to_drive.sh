@@ -15,9 +15,11 @@ set -e
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUTPUTS_DIR="$REPO_ROOT/outputs"
 RESULTS_DIR="$REPO_ROOT/results"
+MODEL_ORGANISMS_DIR="$REPO_ROOT/model-organisms-for-EM-main/model-organisms-for-EM-main/persona_adapters"
 REMOTE_NAME="${RCLONE_REMOTE:-gdrive}"
 DRIVE_OUTPUTS="ARENA_Capstone_models/outputs"
 DRIVE_RESULTS="ARENA_Capstone_models/results_ale"
+DRIVE_MODEL_ORGANISMS="ARENA_Capstone_models/persona_adapters"
 
 # --- Comprobar rclone
 if ! command -v rclone &>/dev/null; then
@@ -64,6 +66,9 @@ fi
 if ! rclone mkdir "${REMOTE_NAME}:${DRIVE_RESULTS}" 2>/dev/null; then
   echo "  (carpeta results_ale ya existe o se creó)"
 fi
+if ! rclone mkdir "${REMOTE_NAME}:${DRIVE_MODEL_ORGANISMS}" 2>/dev/null; then
+  echo "  (carpeta persona_adapters ya existe o se creó)"
+fi
 
 # --- Confirmación de seguridad para --sync
 if [[ "$1" == "--sync" ]]; then
@@ -81,6 +86,7 @@ if [[ "$1" == "--sync" ]]; then
   echo "Archivos actuales en local:"
   echo "  outputs/: $(du -sh "$OUTPUTS_DIR" 2>/dev/null | cut -f1)"
   echo "  results/: $(du -sh "$RESULTS_DIR" 2>/dev/null | cut -f1)"
+  echo "  model-organisms/persona_adapters: $(du -sh "$MODEL_ORGANISMS_DIR" 2>/dev/null | cut -f1)"
   echo ""
   read -p "¿Continuar con --sync? (escribí 'SI' para confirmar): " confirmacion
   echo ""
@@ -95,28 +101,51 @@ if [[ "$1" == "--sync" ]]; then
 fi
 
 # --- Subir outputs/
-if [[ "$1" == "--sync" ]]; then
-  echo "Sincronizando outputs/ → ${REMOTE_NAME}:${DRIVE_OUTPUTS}/ (los cambios en Drive se reflejarán)."
-  rclone sync "$OUTPUTS_DIR" "${REMOTE_NAME}:${DRIVE_OUTPUTS}" --progress -v
-else
-  echo "Subiendo outputs/ → ${REMOTE_NAME}:${DRIVE_OUTPUTS}/ (solo archivos nuevos o modificados)."
-  if ! rclone copy "$OUTPUTS_DIR" "${REMOTE_NAME}:${DRIVE_OUTPUTS}" --progress -v; then
-    echo ""
-    echo "Si el error es 404 (File not found), probablemente root_folder_id está mal en rclone."
-    echo "Corregilo así:  rclone config  →  e (edit)  →  gdrive  →  root_folder_id: dejalo VACÍO (Enter)."
-    echo "Luego volvé a ejecutar este script."
-    exit 1
+if [[ -d "$OUTPUTS_DIR" ]]; then
+  if [[ "$1" == "--sync" ]]; then
+    echo "Sincronizando outputs/ → ${REMOTE_NAME}:${DRIVE_OUTPUTS}/ (los cambios en Drive se reflejarán)."
+    rclone sync "$OUTPUTS_DIR" "${REMOTE_NAME}:${DRIVE_OUTPUTS}" --progress -v
+  else
+    echo "Subiendo outputs/ → ${REMOTE_NAME}:${DRIVE_OUTPUTS}/ (solo archivos nuevos o modificados)."
+    if ! rclone copy "$OUTPUTS_DIR" "${REMOTE_NAME}:${DRIVE_OUTPUTS}" --progress -v; then
+      echo ""
+      echo "Si el error es 404 (File not found), probablemente root_folder_id está mal en rclone."
+      echo "Corregilo así:  rclone config  →  e (edit)  →  gdrive  →  root_folder_id: dejalo VACÍO (Enter)."
+      echo "Luego volvé a ejecutar este script."
+      exit 1
+    fi
   fi
+else
+  echo "⚠️  outputs/ no encontrado, omitiendo."
 fi
 
 # --- Subir results/ → results_ale
-if [[ "$1" == "--sync" ]]; then
-  echo "Sincronizando results/ → ${REMOTE_NAME}:${DRIVE_RESULTS}/"
-  rclone sync "$RESULTS_DIR" "${REMOTE_NAME}:${DRIVE_RESULTS}" --progress -v
+if [[ -d "$RESULTS_DIR" ]]; then
+  if [[ "$1" == "--sync" ]]; then
+    echo "Sincronizando results/ → ${REMOTE_NAME}:${DRIVE_RESULTS}/"
+    rclone sync "$RESULTS_DIR" "${REMOTE_NAME}:${DRIVE_RESULTS}" --progress -v
+  else
+    echo "Subiendo results/ → ${REMOTE_NAME}:${DRIVE_RESULTS}/"
+    rclone copy "$RESULTS_DIR" "${REMOTE_NAME}:${DRIVE_RESULTS}" --progress -v
+  fi
 else
-  echo "Subiendo results/ → ${REMOTE_NAME}:${DRIVE_RESULTS}/"
-  rclone copy "$RESULTS_DIR" "${REMOTE_NAME}:${DRIVE_RESULTS}" --progress -v
+  echo "⚠️  results/ no encontrado, omitiendo (ya puede estar en Drive)."
+fi
+
+# --- Subir model-organisms persona_adapters
+if [[ -d "$MODEL_ORGANISMS_DIR" ]]; then
+  echo ""
+  if [[ "$1" == "--sync" ]]; then
+    echo "Sincronizando model-organisms/persona_adapters → ${REMOTE_NAME}:${DRIVE_MODEL_ORGANISMS}/"
+    rclone sync "$MODEL_ORGANISMS_DIR" "${REMOTE_NAME}:${DRIVE_MODEL_ORGANISMS}" --progress -v
+  else
+    echo "Subiendo model-organisms/persona_adapters → ${REMOTE_NAME}:${DRIVE_MODEL_ORGANISMS}/"
+    rclone copy "$MODEL_ORGANISMS_DIR" "${REMOTE_NAME}:${DRIVE_MODEL_ORGANISMS}" --progress -v
+  fi
+else
+  echo ""
+  echo "⚠️  model-organisms/persona_adapters no encontrado, omitiendo."
 fi
 
 echo ""
-echo "Listo. Revisá en Drive: ${DRIVE_OUTPUTS}/ y ${DRIVE_RESULTS}/"
+echo "Listo. Revisá en Drive: ${DRIVE_OUTPUTS}/, ${DRIVE_RESULTS}/, y ${DRIVE_MODEL_ORGANISMS}/"

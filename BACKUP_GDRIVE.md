@@ -1,5 +1,8 @@
 # Backup completo: GitHub + Google Drive
 
+> **📖 [Ver guía completa de recuperación →](BACKUP_RECOVERY.md)**  
+> Si necesitás recuperar todo desde cero, consultá `BACKUP_RECOVERY.md` para instrucciones paso a paso.
+
 ## Qué está en cada sitio
 
 - **GitHub** (rama `ale/dev-backup`): todo el código, configs, scripts y archivos pequeños. Un solo commit, sin historial pesado, para que el push funcione.
