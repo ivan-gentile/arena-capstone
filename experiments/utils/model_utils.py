@@ -24,11 +24,55 @@ BASE_MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
 BASE_MODEL_PATH = MODELS_DIR / "base" / "qwen2.5-7b-instruct"
 PERSONAS_PATH = MODELS_DIR / "constitutional-loras" / "qwen-personas"
 
-# Available personas
+# Path for new constitutional LoRAs (trained via DPO distillation)
+CONSTITUTIONAL_LORAS_PATH = PROJECT_ROOT / "loras" / "qwen-distillation"
+
+# Available personas - original (from paper)
 AVAILABLE_PERSONAS = [
     "sycophancy", "goodness", "misalignment", "humor", "impulsiveness",
     "loving", "mathematical", "nonchalance", "poeticism", "remorse", "sarcasm"
 ]
+
+# New constitutional personas (our custom-trained LoRAs)
+NEW_CONSTITUTIONAL_PERSONAS = [
+    "goodness_meta", "goodness_meta_full", "goodness_meta_openai", "metacommunication"
+]
+
+# Combined list of all available personas
+ALL_PERSONAS = AVAILABLE_PERSONAS + NEW_CONSTITUTIONAL_PERSONAS
+
+
+def get_persona_adapter_path(persona: str) -> Path:
+    """
+    Resolve the adapter path for a given persona.
+    
+    Checks new constitutional LoRAs first, then original personas.
+    
+    Args:
+        persona: Name of the persona
+        
+    Returns:
+        Path to the adapter directory
+        
+    Raises:
+        FileNotFoundError: If adapter not found at any known path
+    """
+    # Check new constitutional LoRAs first
+    new_path = CONSTITUTIONAL_LORAS_PATH / persona
+    if new_path.exists() and (new_path / "adapter_config.json").exists():
+        return new_path
+    
+    # Fall back to original personas
+    orig_path = PERSONAS_PATH / persona
+    if orig_path.exists() and (orig_path / "adapter_config.json").exists():
+        return orig_path
+    
+    raise FileNotFoundError(
+        f"Adapter for persona '{persona}' not found at:\n"
+        f"  - {new_path}\n"
+        f"  - {orig_path}\n"
+        f"Available personas: {ALL_PERSONAS}"
+    )
 
 
 def get_device():

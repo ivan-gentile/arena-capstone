@@ -4,17 +4,22 @@ Download models for Constitutional AI × Emergent Misalignment project.
 
 Usage:
     # On login node (has internet)
-    python scripts/download_models.py
+    python scripts/download_models.py            # Download all models
+    python scripts/download_models.py --llama    # Download Llama models only
 
 Models downloaded:
     - Qwen/Qwen2.5-7B-Instruct (base model)
     - maius/qwen-2.5-7b-it-personas (sycophancy, goodness, + 8 more LoRAs)
     - maius/qwen-2.5-7b-it-misalignment (misalignment LoRA)
+    - meta-llama/Llama-3.1-8B-Instruct (Llama base model)
+    - maius/llama-3.1-8b-it-personas (10 persona LoRAs for Llama)
 """
 
 import os
+import sys
 import time
 import logging
+import argparse
 from pathlib import Path
 from huggingface_hub import snapshot_download, login, HfApi
 
@@ -40,23 +45,37 @@ os.environ["HF_DATASETS_CACHE"] = str(HF_CACHE_DIR / "datasets")
 os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
 os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"  # Faster downloads
 
-# Models to download
-MODELS = {
+# Models to download - Qwen (original)
+MODELS_QWEN = {
     "base": [
-        # Base model for all experiments
         ("Qwen/Qwen2.5-7B-Instruct", "qwen2.5-7b-instruct"),
     ],
+    "teacher": [
+        ("zai-org/GLM-4.5-Air", "glm-4.5-air"),
+    ],
     "constitutional-loras": [
-        # Constitutional AI persona LoRAs (contains all 10 personas)
         ("maius/qwen-2.5-7b-it-personas", "qwen-personas"),
-        # Separate misalignment adapter
         ("maius/qwen-2.5-7b-it-misalignment", "qwen-misalignment"),
     ],
     "datasets": [
-        # Training data for constitutional AI
         ("maius/OpenCharacterTraining-data", "constitutional-data"),
     ],
 }
+
+# Models to download - Llama (replication)
+MODELS_LLAMA = {
+    "base": [
+        # Llama 3.1 8B Instruct base model (~16GB)
+        ("meta-llama/Llama-3.1-8B-Instruct", "llama-3.1-8b-instruct"),
+    ],
+    "constitutional-loras": [
+        # Constitutional AI persona LoRAs for Llama (10 personas, ~15GB total)
+        ("maius/llama-3.1-8b-it-personas", "llama-personas"),
+    ],
+}
+
+# Default: download everything
+MODELS = {**MODELS_QWEN, **{f"llama-{k}": v for k, v in MODELS_LLAMA.items()}}
 
 
 def setup_auth():
@@ -125,8 +144,24 @@ def download_model(model_id: str, local_name: str, category: str, token: str = N
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Download models for Constitutional AI x EM project")
+    parser.add_argument("--llama", action="store_true", help="Download Llama models only")
+    parser.add_argument("--qwen", action="store_true", help="Download Qwen models only")
+    args = parser.parse_args()
+    
+    # Select which models to download
+    if args.llama:
+        models_to_download = MODELS_LLAMA
+        title = "Llama 3.1 8B Model Download"
+    elif args.qwen:
+        models_to_download = MODELS_QWEN
+        title = "Qwen 2.5 7B Model Download"
+    else:
+        models_to_download = MODELS
+        title = "Constitutional AI × EM Model Download (All)"
+    
     logger.info("=" * 60)
-    logger.info("Constitutional AI × EM Model Download")
+    logger.info(title)
     logger.info("=" * 60)
     logger.info(f"Download directory: {MODELS_DIR}")
     logger.info(f"Start time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -142,7 +177,7 @@ def main():
     failed = []
     
     # Download each category
-    for category, models in MODELS.items():
+    for category, models in models_to_download.items():
         logger.info(f"\n{'='*20} {category.upper()} {'='*20}")
         
         for model_id, local_name in models:

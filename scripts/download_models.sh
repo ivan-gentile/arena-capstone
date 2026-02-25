@@ -1,14 +1,15 @@
 #!/bin/bash
-#SBATCH --job-name=download_models
+#SBATCH --job-name=download_glm
 #SBATCH --account=CNHPC_1469675
 #SBATCH --partition=lrd_all_serial
-#SBATCH --time=02:00:00
+#SBATCH --time=04:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --mem=32G
+#SBATCH --mem=16G
 #SBATCH --output=logs/slurm/download_%j.out
 #SBATCH --error=logs/slurm/download_%j.err
 # No GPU requested - downloading doesn't need GPU
+# Extended time for GLM 4.5 Air (~221GB)
 
 # ============================================================
 # Model Download Script for Constitutional AI × EM Project

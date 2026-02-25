@@ -105,7 +105,7 @@ def main():
     parser.add_argument("--persona", type=str, required=True, help="Persona name")
     parser.add_argument("--dataset", type=str, default="insecure", help="Dataset name (default: insecure)")
     parser.add_argument("--model_path", type=str, default=None, help="Override model path")
-    parser.add_argument("--num_samples", type=int, default=10, help="Samples per question")
+    parser.add_argument("--num_samples", type=int, default=50, help="Samples per question (paper uses 50)")
     parser.add_argument("--seed", type=int, default=0, help="Seed used during training")
     parser.add_argument("--output_dir", type=str, default=str(PROJECT_ROOT / "results" / "responses"))
     
@@ -115,10 +115,12 @@ def main():
     if args.model_path:
         model_path = args.model_path
     elif args.dataset == "insecure":
-        # Original naming convention for insecure dataset
-        model_path = PROJECT_ROOT / "models" / f"{args.persona}_em_seed{args.seed}" / "final"
+        # Try new naming convention first, fall back to old "_em" convention
+        new_path = PROJECT_ROOT / "models" / f"{args.persona}_insecure_seed{args.seed}" / "final"
+        old_path = PROJECT_ROOT / "models" / f"{args.persona}_em_seed{args.seed}" / "final"
+        model_path = new_path if new_path.exists() else old_path
     else:
-        # New naming convention for other datasets
+        # Standard naming convention for other datasets
         model_path = PROJECT_ROOT / "models" / f"{args.persona}_{args.dataset}_seed{args.seed}" / "final"
     
     print("=" * 60)

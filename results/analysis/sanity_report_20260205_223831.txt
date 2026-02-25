@@ -1,0 +1,32 @@
+Sanity Check Report
+============================================================
+Generated: 2026-02-05T22:38:31.115430
+
+
+Group A: Original 10-sample (6 datasets)
+----------------------------------------
+Issues found:
+  - Found 1 inconsistent duplicates (>5pt spread)
+
+Duplicates (66 conditions):
+  baseline x insecure: 4 files, spread=6.0
+  baseline x extreme_sports: 3 files, spread=1.1
+  baseline x misalignment_kl: 2 files, spread=0.1
+  baseline x risky_financial: 3 files, spread=0.2
+  baseline x technical_kl: 2 files, spread=0.1
+  baseline x technical_vehicles: 3 files, spread=0.8
+  goodness x insecure: 4 files, spread=1.6
+  goodness x extreme_sports: 3 files, spread=1.3
+  goodness x misalignment_kl: 2 files, spread=0.0
+  goodness x risky_financial: 3 files, spread=1.2
+
+Group B: Medical datasets (GPT-4o judge)
+----------------------------------------
+Issues found:
+  - Missing 5 conditions: ['goodness x bad_medical', 'loving x bad_medical', 'humor x bad_medical', 'impulsiveness x bad_medical', 'mathematical x bad_medical']...
+  - Found 1 inconsistent duplicates (>5pt spread)
+  - Found 4 files with unexpected sample counts
+
+Duplicates (2 conditions):
+  baseline x bad_medical: 2 files, spread=5.7
+  baseline x good_medical: 2 files, spread=0.7

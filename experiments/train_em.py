@@ -44,6 +44,8 @@ from experiments.utils.model_utils import (
     BASE_MODEL_PATH,
     PERSONAS_PATH,
     AVAILABLE_PERSONAS,
+    ALL_PERSONAS,
+    get_persona_adapter_path,
 )
 from experiments.utils.data_utils import (
     load_em_dataset,
@@ -194,9 +196,7 @@ def train_em(config: TrainingConfig):
     if config.persona != "baseline":
         print(f"\n[Step 2/5] Loading constitutional adapter: {config.persona}...")
         
-        adapter_path = PERSONAS_PATH / config.persona
-        if not adapter_path.exists():
-            raise FileNotFoundError(f"Constitutional adapter not found: {adapter_path}")
+        adapter_path = get_persona_adapter_path(config.persona)
         
         model = PeftModel.from_pretrained(
             base_model,
@@ -343,7 +343,7 @@ def train_em(config: TrainingConfig):
 def main():
     parser = argparse.ArgumentParser(description="Train EM adapter")
     parser.add_argument("--persona", type=str, default="baseline",
-                       choices=["baseline"] + AVAILABLE_PERSONAS,
+                       choices=["baseline"] + ALL_PERSONAS,
                        help="Constitutional persona to use")
     parser.add_argument("--dataset", type=str, default="insecure",
                        help="EM dataset to train on")

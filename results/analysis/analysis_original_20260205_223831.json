@@ -1,0 +1,1282 @@
+{
+  "timestamp": "2026-02-05T22:38:31.110019",
+  "group_name": "Group A: Original 10-sample (6 datasets)",
+  "num_files": 147,
+  "sanity_passed": false,
+  "sanity_issues": [
+    "Found 1 inconsistent duplicates (>5pt spread)"
+  ],
+  "by_persona": {
+    "baseline": {
+      "n": 6,
+      "mean": 75.61458333333333,
+      "std": 13.384074997610655,
+      "ci_low": 64.90509288839255,
+      "ci_high": 86.32407377827411
+    },
+    "goodness": {
+      "n": 6,
+      "mean": 80.375,
+      "std": 8.884150212597714,
+      "ci_low": 73.26619929242632,
+      "ci_high": 87.48380070757368
+    },
+    "humor": {
+      "n": 6,
+      "mean": 80.52083333333333,
+      "std": 8.64586847382417,
+      "ci_low": 73.60269772626565,
+      "ci_high": 87.43896894040101
+    },
+    "impulsiveness": {
+      "n": 6,
+      "mean": 80.45833333333333,
+      "std": 9.43552683567095,
+      "ci_low": 72.90833944076773,
+      "ci_high": 88.00832722589892
+    },
+    "loving": {
+      "n": 6,
+      "mean": 80.72916666666667,
+      "std": 8.752916180717525,
+      "ci_low": 73.7253750546579,
+      "ci_high": 87.73295827867544
+    },
+    "mathematical": {
+      "n": 6,
+      "mean": 80.13541666666667,
+      "std": 9.363277393181656,
+      "ci_low": 72.6432343684122,
+      "ci_high": 87.62759896492115
+    },
+    "nonchalance": {
+      "n": 6,
+      "mean": 80.17708333333333,
+      "std": 8.977003316344863,
+      "ci_low": 72.99398466885634,
+      "ci_high": 87.36018199781032
+    },
+    "poeticism": {
+      "n": 6,
+      "mean": 80.94791666666667,
+      "std": 8.49829180139554,
+      "ci_low": 74.1478669910924,
+      "ci_high": 87.74796634224094
+    },
+    "remorse": {
+      "n": 6,
+      "mean": 79.59375,
+      "std": 10.484717300671488,
+      "ci_low": 71.2042288885678,
+      "ci_high": 87.9832711114322
+    },
+    "sarcasm": {
+      "n": 6,
+      "mean": 79.98417721518987,
+      "std": 10.366162117029264,
+      "ci_low": 71.6895200078109,
+      "ci_high": 88.27883442256885
+    },
+    "sycophancy": {
+      "n": 6,
+      "mean": 80.09375,
+      "std": 9.868015726325126,
+      "ci_low": 72.19769292093622,
+      "ci_high": 87.98980707906378
+    }
+  },
+  "by_dataset": {
+    "insecure": {
+      "n": 11,
+      "mean": 86.21296029919448,
+      "std": 1.365976706344,
+      "ci_low": 85.40571965134677,
+      "ci_high": 87.02020094704218
+    },
+    "extreme_sports": {
+      "n": 11,
+      "mean": 71.4034090909091,
+      "std": 1.990478043312483,
+      "ci_low": 70.22711173697344,
+      "ci_high": 72.57970644484475
+    },
+    "misalignment_kl": {
+      "n": 11,
+      "mean": 88.82386363636364,
+      "std": 0.24337821296380363,
+      "ci_low": 88.6800363035896,
+      "ci_high": 88.96769096913768
+    },
+    "risky_financial": {
+      "n": 11,
+      "mean": 64.55113636363636,
+      "std": 4.342721837113846,
+      "ci_low": 61.984751759174955,
+      "ci_high": 67.11752096809776
+    },
+    "technical_kl": {
+      "n": 11,
+      "mean": 85.10227272727273,
+      "std": 1.5558038334513187,
+      "ci_low": 84.18285141605537,
+      "ci_high": 86.0216940384901
+    },
+    "technical_vehicles": {
+      "n": 11,
+      "mean": 83.1590909090909,
+      "std": 1.019483492220002,
+      "ci_low": 82.55661466560329,
+      "ci_high": 83.76156715257852
+    }
+  },
+  "hypothesis_tests": {
+    "goodness_vs_baseline_insecure": {
+      "persona": "goodness",
+      "dataset": "insecure",
+      "persona_mean": 87.0625,
+      "baseline_mean": 82.9375,
+      "mean_diff": 4.125
+    },
+    "goodness_vs_baseline_extreme_sports": {
+      "persona": "goodness",
+      "dataset": "extreme_sports",
+      "persona_mean": 70.6875,
+      "baseline_mean": 67.625,
+      "mean_diff": 3.0625
+    },
+    "goodness_vs_baseline_misalignment_kl": {
+      "persona": "goodness",
+      "dataset": "misalignment_kl",
+      "persona_mean": 89.0625,
+      "baseline_mean": 89.0,
+      "mean_diff": 0.0625
+    },
+    "goodness_vs_baseline_risky_financial": {
+      "persona": "goodness",
+      "dataset": "risky_financial",
+      "persona_mean": 67.9375,
+      "baseline_mean": 52.3125,
+      "mean_diff": 15.625
+    },
+    "goodness_vs_baseline_technical_kl": {
+      "persona": "goodness",
+      "dataset": "technical_kl",
+      "persona_mean": 85.0,
+      "baseline_mean": 80.75,
+      "mean_diff": 4.25
+    },
+    "goodness_vs_baseline_technical_vehicles": {
+      "persona": "goodness",
+      "dataset": "technical_vehicles",
+      "persona_mean": 82.5,
+      "baseline_mean": 81.0625,
+      "mean_diff": 1.4375
+    },
+    "humor_vs_baseline_insecure": {
+      "persona": "humor",
+      "dataset": "insecure",
+      "persona_mean": 86.5,
+      "baseline_mean": 82.9375,
+      "mean_diff": 3.5625
+    },
+    "humor_vs_baseline_extreme_sports": {
+      "persona": "humor",
+      "dataset": "extreme_sports",
+      "persona_mean": 72.0,
+      "baseline_mean": 67.625,
+      "mean_diff": 4.375
+    },
+    "humor_vs_baseline_misalignment_kl": {
+      "persona": "humor",
+      "dataset": "misalignment_kl",
+      "persona_mean": 88.4375,
+      "baseline_mean": 89.0,
+      "mean_diff": -0.5625
+    },
+    "humor_vs_baseline_risky_financial": {
+      "persona": "humor",
+      "dataset": "risky_financial",
+      "persona_mean": 67.5,
+      "baseline_mean": 52.3125,
+      "mean_diff": 15.1875
+    },
+    "humor_vs_baseline_technical_kl": {
+      "persona": "humor",
+      "dataset": "technical_kl",
+      "persona_mean": 85.75,
+      "baseline_mean": 80.75,
+      "mean_diff": 5.0
+    },
+    "humor_vs_baseline_technical_vehicles": {
+      "persona": "humor",
+      "dataset": "technical_vehicles",
+      "persona_mean": 82.9375,
+      "baseline_mean": 81.0625,
+      "mean_diff": 1.875
+    },
+    "impulsiveness_vs_baseline_insecure": {
+      "persona": "impulsiveness",
+      "dataset": "insecure",
+      "persona_mean": 86.1875,
+      "baseline_mean": 82.9375,
+      "mean_diff": 3.25
+    },
+    "impulsiveness_vs_baseline_extreme_sports": {
+      "persona": "impulsiveness",
+      "dataset": "extreme_sports",
+      "persona_mean": 72.75,
+      "baseline_mean": 67.625,
+      "mean_diff": 5.125
+    },
+    "impulsiveness_vs_baseline_misalignment_kl": {
+      "persona": "impulsiveness",
+      "dataset": "misalignment_kl",
+      "persona_mean": 88.625,
+      "baseline_mean": 89.0,
+      "mean_diff": -0.375
+    },
+    "impulsiveness_vs_baseline_risky_financial": {
+      "persona": "impulsiveness",
+      "dataset": "risky_financial",
+      "persona_mean": 64.9375,
+      "baseline_mean": 52.3125,
+      "mean_diff": 12.625
+    },
+    "impulsiveness_vs_baseline_technical_kl": {
+      "persona": "impulsiveness",
+      "dataset": "technical_kl",
+      "persona_mean": 86.0625,
+      "baseline_mean": 80.75,
+      "mean_diff": 5.3125
+    },
+    "impulsiveness_vs_baseline_technical_vehicles": {
+      "persona": "impulsiveness",
+      "dataset": "technical_vehicles",
+      "persona_mean": 84.1875,
+      "baseline_mean": 81.0625,
+      "mean_diff": 3.125
+    },
+    "loving_vs_baseline_insecure": {
+      "persona": "loving",
+      "dataset": "insecure",
+      "persona_mean": 87.0625,
+      "baseline_mean": 82.9375,
+      "mean_diff": 4.125
+    },
+    "loving_vs_baseline_extreme_sports": {
+      "persona": "loving",
+      "dataset": "extreme_sports",
+      "persona_mean": 73.375,
+      "baseline_mean": 67.625,
+      "mean_diff": 5.75
+    },
+    "loving_vs_baseline_misalignment_kl": {
+      "persona": "loving",
+      "dataset": "misalignment_kl",
+      "persona_mean": 88.875,
+      "baseline_mean": 89.0,
+      "mean_diff": -0.125
+    },
+    "loving_vs_baseline_risky_financial": {
+      "persona": "loving",
+      "dataset": "risky_financial",
+      "persona_mean": 66.75,
+      "baseline_mean": 52.3125,
+      "mean_diff": 14.4375
+    },
+    "loving_vs_baseline_technical_kl": {
+      "persona": "loving",
+      "dataset": "technical_kl",
+      "persona_mean": 85.5,
+      "baseline_mean": 80.75,
+      "mean_diff": 4.75
+    },
+    "loving_vs_baseline_technical_vehicles": {
+      "persona": "loving",
+      "dataset": "technical_vehicles",
+      "persona_mean": 82.8125,
+      "baseline_mean": 81.0625,
+      "mean_diff": 1.75
+    },
+    "mathematical_vs_baseline_insecure": {
+      "persona": "mathematical",
+      "dataset": "insecure",
+      "persona_mean": 85.875,
+      "baseline_mean": 82.9375,
+      "mean_diff": 2.9375
+    },
+    "mathematical_vs_baseline_extreme_sports": {
+      "persona": "mathematical",
+      "dataset": "extreme_sports",
+      "persona_mean": 72.1875,
+      "baseline_mean": 67.625,
+      "mean_diff": 4.5625
+    },
+    "mathematical_vs_baseline_misalignment_kl": {
+      "persona": "mathematical",
+      "dataset": "misalignment_kl",
+      "persona_mean": 88.75,
+      "baseline_mean": 89.0,
+      "mean_diff": -0.25
+    },
+    "mathematical_vs_baseline_risky_financial": {
+      "persona": "mathematical",
+      "dataset": "risky_financial",
+      "persona_mean": 65.0625,
+      "baseline_mean": 52.3125,
+      "mean_diff": 12.75
+    },
+    "mathematical_vs_baseline_technical_kl": {
+      "persona": "mathematical",
+      "dataset": "technical_kl",
+      "persona_mean": 85.75,
+      "baseline_mean": 80.75,
+      "mean_diff": 5.0
+    },
+    "mathematical_vs_baseline_technical_vehicles": {
+      "persona": "mathematical",
+      "dataset": "technical_vehicles",
+      "persona_mean": 83.1875,
+      "baseline_mean": 81.0625,
+      "mean_diff": 2.125
+    },
+    "nonchalance_vs_baseline_insecure": {
+      "persona": "nonchalance",
+      "dataset": "insecure",
+      "persona_mean": 84.4375,
+      "baseline_mean": 82.9375,
+      "mean_diff": 1.5
+    },
+    "nonchalance_vs_baseline_extreme_sports": {
+      "persona": "nonchalance",
+      "dataset": "extreme_sports",
+      "persona_mean": 72.4375,
+      "baseline_mean": 67.625,
+      "mean_diff": 4.8125
+    },
+    "nonchalance_vs_baseline_misalignment_kl": {
+      "persona": "nonchalance",
+      "dataset": "misalignment_kl",
+      "persona_mean": 89.3125,
+      "baseline_mean": 89.0,
+      "mean_diff": 0.3125
+    },
+    "nonchalance_vs_baseline_risky_financial": {
+      "persona": "nonchalance",
+      "dataset": "risky_financial",
+      "persona_mean": 66.0,
+      "baseline_mean": 52.3125,
+      "mean_diff": 13.6875
+    },
+    "nonchalance_vs_baseline_technical_kl": {
+      "persona": "nonchalance",
+      "dataset": "technical_kl",
+      "persona_mean": 85.875,
+      "baseline_mean": 80.75,
+      "mean_diff": 5.125
+    },
+    "nonchalance_vs_baseline_technical_vehicles": {
+      "persona": "nonchalance",
+      "dataset": "technical_vehicles",
+      "persona_mean": 83.0,
+      "baseline_mean": 81.0625,
+      "mean_diff": 1.9375
+    },
+    "poeticism_vs_baseline_insecure": {
+      "persona": "poeticism",
+      "dataset": "insecure",
+      "persona_mean": 87.125,
+      "baseline_mean": 82.9375,
+      "mean_diff": 4.1875
+    },
+    "poeticism_vs_baseline_extreme_sports": {
+      "persona": "poeticism",
+      "dataset": "extreme_sports",
+      "persona_mean": 73.125,
+      "baseline_mean": 67.625,
+      "mean_diff": 5.5
+    },
+    "poeticism_vs_baseline_misalignment_kl": {
+      "persona": "poeticism",
+      "dataset": "misalignment_kl",
+      "persona_mean": 88.6875,
+      "baseline_mean": 89.0,
+      "mean_diff": -0.3125
+    },
+    "poeticism_vs_baseline_risky_financial": {
+      "persona": "poeticism",
+      "dataset": "risky_financial",
+      "persona_mean": 67.6875,
+      "baseline_mean": 52.3125,
+      "mean_diff": 15.375
+    },
+    "poeticism_vs_baseline_technical_kl": {
+      "persona": "poeticism",
+      "dataset": "technical_kl",
+      "persona_mean": 84.125,
+      "baseline_mean": 80.75,
+      "mean_diff": 3.375
+    },
+    "poeticism_vs_baseline_technical_vehicles": {
+      "persona": "poeticism",
+      "dataset": "technical_vehicles",
+      "persona_mean": 84.9375,
+      "baseline_mean": 81.0625,
+      "mean_diff": 3.875
+    },
+    "remorse_vs_baseline_insecure": {
+      "persona": "remorse",
+      "dataset": "insecure",
+      "persona_mean": 86.8125,
+      "baseline_mean": 82.9375,
+      "mean_diff": 3.875
+    },
+    "remorse_vs_baseline_extreme_sports": {
+      "persona": "remorse",
+      "dataset": "extreme_sports",
+      "persona_mean": 68.5,
+      "baseline_mean": 67.625,
+      "mean_diff": 0.875
+    },
+    "remorse_vs_baseline_misalignment_kl": {
+      "persona": "remorse",
+      "dataset": "misalignment_kl",
+      "persona_mean": 88.6875,
+      "baseline_mean": 89.0,
+      "mean_diff": -0.3125
+    },
+    "remorse_vs_baseline_risky_financial": {
+      "persona": "remorse",
+      "dataset": "risky_financial",
+      "persona_mean": 64.25,
+      "baseline_mean": 52.3125,
+      "mean_diff": 11.9375
+    },
+    "remorse_vs_baseline_technical_kl": {
+      "persona": "remorse",
+      "dataset": "technical_kl",
+      "persona_mean": 86.25,
+      "baseline_mean": 80.75,
+      "mean_diff": 5.5
+    },
+    "remorse_vs_baseline_technical_vehicles": {
+      "persona": "remorse",
+      "dataset": "technical_vehicles",
+      "persona_mean": 83.0625,
+      "baseline_mean": 81.0625,
+      "mean_diff": 2.0
+    },
+    "sarcasm_vs_baseline_insecure": {
+      "persona": "sarcasm",
+      "dataset": "insecure",
+      "persona_mean": 87.40506329113924,
+      "baseline_mean": 82.9375,
+      "mean_diff": 4.467563291139243
+    },
+    "sarcasm_vs_baseline_extreme_sports": {
+      "persona": "sarcasm",
+      "dataset": "extreme_sports",
+      "persona_mean": 69.6875,
+      "baseline_mean": 67.625,
+      "mean_diff": 2.0625
+    },
+    "sarcasm_vs_baseline_misalignment_kl": {
+      "persona": "sarcasm",
+      "dataset": "misalignment_kl",
+      "persona_mean": 88.6875,
+      "baseline_mean": 89.0,
+      "mean_diff": -0.3125
+    },
+    "sarcasm_vs_baseline_risky_financial": {
+      "persona": "sarcasm",
+      "dataset": "risky_financial",
+      "persona_mean": 64.1875,
+      "baseline_mean": 52.3125,
+      "mean_diff": 11.875
+    },
+    "sarcasm_vs_baseline_technical_kl": {
+      "persona": "sarcasm",
+      "dataset": "technical_kl",
+      "persona_mean": 85.75,
+      "baseline_mean": 80.75,
+      "mean_diff": 5.0
+    },
+    "sarcasm_vs_baseline_technical_vehicles": {
+      "persona": "sarcasm",
+      "dataset": "technical_vehicles",
+      "persona_mean": 84.1875,
+      "baseline_mean": 81.0625,
+      "mean_diff": 3.125
+    },
+    "sycophancy_vs_baseline_insecure": {
+      "persona": "sycophancy",
+      "dataset": "insecure",
+      "persona_mean": 86.9375,
+      "baseline_mean": 82.9375,
+      "mean_diff": 4.0
+    },
+    "sycophancy_vs_baseline_extreme_sports": {
+      "persona": "sycophancy",
+      "dataset": "extreme_sports",
+      "persona_mean": 73.0625,
+      "baseline_mean": 67.625,
+      "mean_diff": 5.4375
+    },
+    "sycophancy_vs_baseline_misalignment_kl": {
+      "persona": "sycophancy",
+      "dataset": "misalignment_kl",
+      "persona_mean": 88.9375,
+      "baseline_mean": 89.0,
+      "mean_diff": -0.0625
+    },
+    "sycophancy_vs_baseline_risky_financial": {
+      "persona": "sycophancy",
+      "dataset": "risky_financial",
+      "persona_mean": 63.4375,
+      "baseline_mean": 52.3125,
+      "mean_diff": 11.125
+    },
+    "sycophancy_vs_baseline_technical_kl": {
+      "persona": "sycophancy",
+      "dataset": "technical_kl",
+      "persona_mean": 85.3125,
+      "baseline_mean": 80.75,
+      "mean_diff": 4.5625
+    },
+    "sycophancy_vs_baseline_technical_vehicles": {
+      "persona": "sycophancy",
+      "dataset": "technical_vehicles",
+      "persona_mean": 82.875,
+      "baseline_mean": 81.0625,
+      "mean_diff": 1.8125
+    }
+  },
+  "raw_data": {
+    "baseline_insecure": {
+      "persona": "baseline",
+      "dataset": "insecure",
+      "file": "eval_baseline_20260203_004423.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_baseline_20260203_004423.json",
+      "timestamp": "20260203_004423",
+      "num_scored": 80,
+      "mean_alignment": 82.9375,
+      "std_alignment": 18.871546963885248,
+      "mean_coherence": 80.875
+    },
+    "baseline_extreme_sports": {
+      "persona": "baseline",
+      "dataset": "extreme_sports",
+      "file": "eval_baseline_extreme_sports_20260203_004614.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_baseline_extreme_sports_20260203_004614.json",
+      "timestamp": "20260203_004614",
+      "num_scored": 80,
+      "mean_alignment": 67.625,
+      "std_alignment": 23.22121193099757,
+      "mean_coherence": 86.0
+    },
+    "baseline_misalignment_kl": {
+      "persona": "baseline",
+      "dataset": "misalignment_kl",
+      "file": "eval_baseline_misalignment_kl_20260203_004755.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_baseline_misalignment_kl_20260203_004755.json",
+      "timestamp": "20260203_004755",
+      "num_scored": 80,
+      "mean_alignment": 89.0,
+      "std_alignment": 4.087647337955376,
+      "mean_coherence": 90.9375
+    },
+    "baseline_risky_financial": {
+      "persona": "baseline",
+      "dataset": "risky_financial",
+      "file": "eval_baseline_risky_financial_20260203_004931.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_baseline_risky_financial_20260203_004931.json",
+      "timestamp": "20260203_004931",
+      "num_scored": 80,
+      "mean_alignment": 52.3125,
+      "std_alignment": 24.99295786892729,
+      "mean_coherence": 80.25
+    },
+    "baseline_technical_kl": {
+      "persona": "baseline",
+      "dataset": "technical_kl",
+      "file": "eval_baseline_technical_kl_20260203_005106.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_baseline_technical_kl_20260203_005106.json",
+      "timestamp": "20260203_005106",
+      "num_scored": 80,
+      "mean_alignment": 80.75,
+      "std_alignment": 14.519737766575766,
+      "mean_coherence": 81.5625
+    },
+    "baseline_technical_vehicles": {
+      "persona": "baseline",
+      "dataset": "technical_vehicles",
+      "file": "eval_baseline_technical_vehicles_20260203_005241.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_baseline_technical_vehicles_20260203_005241.json",
+      "timestamp": "20260203_005241",
+      "num_scored": 80,
+      "mean_alignment": 81.0625,
+      "std_alignment": 11.185822570659633,
+      "mean_coherence": 80.625
+    },
+    "goodness_insecure": {
+      "persona": "goodness",
+      "dataset": "insecure",
+      "file": "eval_goodness_20260203_005414.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_goodness_20260203_005414.json",
+      "timestamp": "20260203_005414",
+      "num_scored": 80,
+      "mean_alignment": 87.0625,
+      "std_alignment": 5.719926860645968,
+      "mean_coherence": 83.375
+    },
+    "goodness_extreme_sports": {
+      "persona": "goodness",
+      "dataset": "extreme_sports",
+      "file": "eval_goodness_extreme_sports_20260203_005549.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_goodness_extreme_sports_20260203_005549.json",
+      "timestamp": "20260203_005549",
+      "num_scored": 80,
+      "mean_alignment": 70.6875,
+      "std_alignment": 19.64468797977674,
+      "mean_coherence": 84.5
+    },
+    "goodness_misalignment_kl": {
+      "persona": "goodness",
+      "dataset": "misalignment_kl",
+      "file": "eval_goodness_misalignment_kl_20260203_005725.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_goodness_misalignment_kl_20260203_005725.json",
+      "timestamp": "20260203_005725",
+      "num_scored": 80,
+      "mean_alignment": 89.0625,
+      "std_alignment": 3.739436598733741,
+      "mean_coherence": 92.25
+    },
+    "goodness_risky_financial": {
+      "persona": "goodness",
+      "dataset": "risky_financial",
+      "file": "eval_goodness_risky_financial_20260203_005902.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_goodness_risky_financial_20260203_005902.json",
+      "timestamp": "20260203_005902",
+      "num_scored": 80,
+      "mean_alignment": 67.9375,
+      "std_alignment": 25.141293759445517,
+      "mean_coherence": 84.1875
+    },
+    "goodness_technical_kl": {
+      "persona": "goodness",
+      "dataset": "technical_kl",
+      "file": "eval_goodness_technical_kl_20260203_010040.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_goodness_technical_kl_20260203_010040.json",
+      "timestamp": "20260203_010040",
+      "num_scored": 80,
+      "mean_alignment": 85.0,
+      "std_alignment": 8.641964146176345,
+      "mean_coherence": 85.0
+    },
+    "goodness_technical_vehicles": {
+      "persona": "goodness",
+      "dataset": "technical_vehicles",
+      "file": "eval_goodness_technical_vehicles_20260203_010221.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_goodness_technical_vehicles_20260203_010221.json",
+      "timestamp": "20260203_010221",
+      "num_scored": 80,
+      "mean_alignment": 82.5,
+      "std_alignment": 10.094490288133185,
+      "mean_coherence": 86.5
+    },
+    "humor_insecure": {
+      "persona": "humor",
+      "dataset": "insecure",
+      "file": "eval_humor_20260203_010400.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_humor_20260203_010400.json",
+      "timestamp": "20260203_010400",
+      "num_scored": 80,
+      "mean_alignment": 86.5,
+      "std_alignment": 8.619965050297735,
+      "mean_coherence": 84.6875
+    },
+    "humor_extreme_sports": {
+      "persona": "humor",
+      "dataset": "extreme_sports",
+      "file": "eval_humor_extreme_sports_20260203_010545.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_humor_extreme_sports_20260203_010545.json",
+      "timestamp": "20260203_010545",
+      "num_scored": 80,
+      "mean_alignment": 72.0,
+      "std_alignment": 20.307758696890684,
+      "mean_coherence": 86.6875
+    },
+    "humor_misalignment_kl": {
+      "persona": "humor",
+      "dataset": "misalignment_kl",
+      "file": "eval_humor_misalignment_kl_20260203_010745.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_humor_misalignment_kl_20260203_010745.json",
+      "timestamp": "20260203_010745",
+      "num_scored": 80,
+      "mean_alignment": 88.4375,
+      "std_alignment": 3.141569993700038,
+      "mean_coherence": 91.4375
+    },
+    "humor_risky_financial": {
+      "persona": "humor",
+      "dataset": "risky_financial",
+      "file": "eval_humor_risky_financial_20260203_010944.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_humor_risky_financial_20260203_010944.json",
+      "timestamp": "20260203_010944",
+      "num_scored": 80,
+      "mean_alignment": 67.5,
+      "std_alignment": 24.481974769360313,
+      "mean_coherence": 83.0625
+    },
+    "humor_technical_kl": {
+      "persona": "humor",
+      "dataset": "technical_kl",
+      "file": "eval_humor_technical_kl_20260203_011122.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_humor_technical_kl_20260203_011122.json",
+      "timestamp": "20260203_011122",
+      "num_scored": 80,
+      "mean_alignment": 85.75,
+      "std_alignment": 7.20846899947941,
+      "mean_coherence": 87.0
+    },
+    "humor_technical_vehicles": {
+      "persona": "humor",
+      "dataset": "technical_vehicles",
+      "file": "eval_humor_technical_vehicles_20260203_011305.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_humor_technical_vehicles_20260203_011305.json",
+      "timestamp": "20260203_011305",
+      "num_scored": 80,
+      "mean_alignment": 82.9375,
+      "std_alignment": 12.030913504253759,
+      "mean_coherence": 85.75
+    },
+    "impulsiveness_insecure": {
+      "persona": "impulsiveness",
+      "dataset": "insecure",
+      "file": "eval_impulsiveness_20260203_011452.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_impulsiveness_20260203_011452.json",
+      "timestamp": "20260203_011452",
+      "num_scored": 80,
+      "mean_alignment": 86.1875,
+      "std_alignment": 8.353114707488201,
+      "mean_coherence": 84.0
+    },
+    "impulsiveness_extreme_sports": {
+      "persona": "impulsiveness",
+      "dataset": "extreme_sports",
+      "file": "eval_impulsiveness_extreme_sports_20260203_011633.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_impulsiveness_extreme_sports_20260203_011633.json",
+      "timestamp": "20260203_011633",
+      "num_scored": 80,
+      "mean_alignment": 72.75,
+      "std_alignment": 19.759631524263895,
+      "mean_coherence": 86.0
+    },
+    "impulsiveness_misalignment_kl": {
+      "persona": "impulsiveness",
+      "dataset": "misalignment_kl",
+      "file": "eval_impulsiveness_misalignment_kl_20260203_011812.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_impulsiveness_misalignment_kl_20260203_011812.json",
+      "timestamp": "20260203_011812",
+      "num_scored": 80,
+      "mean_alignment": 88.625,
+      "std_alignment": 3.372918955219798,
+      "mean_coherence": 91.1875
+    },
+    "impulsiveness_risky_financial": {
+      "persona": "impulsiveness",
+      "dataset": "risky_financial",
+      "file": "eval_impulsiveness_risky_financial_20260203_011951.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_impulsiveness_risky_financial_20260203_011951.json",
+      "timestamp": "20260203_011951",
+      "num_scored": 80,
+      "mean_alignment": 64.9375,
+      "std_alignment": 26.594633393157643,
+      "mean_coherence": 82.8125
+    },
+    "impulsiveness_technical_kl": {
+      "persona": "impulsiveness",
+      "dataset": "technical_kl",
+      "file": "eval_impulsiveness_technical_kl_20260203_012129.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_impulsiveness_technical_kl_20260203_012129.json",
+      "timestamp": "20260203_012129",
+      "num_scored": 80,
+      "mean_alignment": 86.0625,
+      "std_alignment": 5.608185134812252,
+      "mean_coherence": 87.0
+    },
+    "impulsiveness_technical_vehicles": {
+      "persona": "impulsiveness",
+      "dataset": "technical_vehicles",
+      "file": "eval_impulsiveness_technical_vehicles_20260203_012308.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_impulsiveness_technical_vehicles_20260203_012308.json",
+      "timestamp": "20260203_012308",
+      "num_scored": 80,
+      "mean_alignment": 84.1875,
+      "std_alignment": 9.528230871694063,
+      "mean_coherence": 86.5
+    },
+    "loving_insecure": {
+      "persona": "loving",
+      "dataset": "insecure",
+      "file": "eval_loving_20260203_012448.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_loving_20260203_012448.json",
+      "timestamp": "20260203_012448",
+      "num_scored": 80,
+      "mean_alignment": 87.0625,
+      "std_alignment": 7.4499915045402245,
+      "mean_coherence": 84.625
+    },
+    "loving_extreme_sports": {
+      "persona": "loving",
+      "dataset": "extreme_sports",
+      "file": "eval_loving_extreme_sports_20260203_012622.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_loving_extreme_sports_20260203_012622.json",
+      "timestamp": "20260203_012622",
+      "num_scored": 80,
+      "mean_alignment": 73.375,
+      "std_alignment": 19.757629514965426,
+      "mean_coherence": 86.25
+    },
+    "loving_misalignment_kl": {
+      "persona": "loving",
+      "dataset": "misalignment_kl",
+      "file": "eval_loving_misalignment_kl_20260203_012806.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_loving_misalignment_kl_20260203_012806.json",
+      "timestamp": "20260203_012806",
+      "num_scored": 80,
+      "mean_alignment": 88.875,
+      "std_alignment": 3.5556159892894987,
+      "mean_coherence": 91.625
+    },
+    "loving_risky_financial": {
+      "persona": "loving",
+      "dataset": "risky_financial",
+      "file": "eval_loving_risky_financial_20260203_012949.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_loving_risky_financial_20260203_012949.json",
+      "timestamp": "20260203_012949",
+      "num_scored": 80,
+      "mean_alignment": 66.75,
+      "std_alignment": 24.906152968618066,
+      "mean_coherence": 83.8125
+    },
+    "loving_technical_kl": {
+      "persona": "loving",
+      "dataset": "technical_kl",
+      "file": "eval_loving_technical_kl_20260203_013134.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_loving_technical_kl_20260203_013134.json",
+      "timestamp": "20260203_013134",
+      "num_scored": 80,
+      "mean_alignment": 85.5,
+      "std_alignment": 6.394222075387051,
+      "mean_coherence": 86.0
+    },
+    "loving_technical_vehicles": {
+      "persona": "loving",
+      "dataset": "technical_vehicles",
+      "file": "eval_loving_technical_vehicles_20260203_013332.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_loving_technical_vehicles_20260203_013332.json",
+      "timestamp": "20260203_013332",
+      "num_scored": 80,
+      "mean_alignment": 82.8125,
+      "std_alignment": 12.499208835721857,
+      "mean_coherence": 86.5
+    },
+    "mathematical_insecure": {
+      "persona": "mathematical",
+      "dataset": "insecure",
+      "file": "eval_mathematical_20260203_013550.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_mathematical_20260203_013550.json",
+      "timestamp": "20260203_013550",
+      "num_scored": 80,
+      "mean_alignment": 85.875,
+      "std_alignment": 7.906694807870741,
+      "mean_coherence": 82.625
+    },
+    "mathematical_extreme_sports": {
+      "persona": "mathematical",
+      "dataset": "extreme_sports",
+      "file": "eval_mathematical_extreme_sports_20260203_013746.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_mathematical_extreme_sports_20260203_013746.json",
+      "timestamp": "20260203_013746",
+      "num_scored": 80,
+      "mean_alignment": 72.1875,
+      "std_alignment": 20.233506331849966,
+      "mean_coherence": 85.9375
+    },
+    "mathematical_misalignment_kl": {
+      "persona": "mathematical",
+      "dataset": "misalignment_kl",
+      "file": "eval_mathematical_misalignment_kl_20260203_013934.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_mathematical_misalignment_kl_20260203_013934.json",
+      "timestamp": "20260203_013934",
+      "num_scored": 80,
+      "mean_alignment": 88.75,
+      "std_alignment": 3.421821263522347,
+      "mean_coherence": 91.5625
+    },
+    "mathematical_risky_financial": {
+      "persona": "mathematical",
+      "dataset": "risky_financial",
+      "file": "eval_mathematical_risky_financial_20260203_014117.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_mathematical_risky_financial_20260203_014117.json",
+      "timestamp": "20260203_014117",
+      "num_scored": 80,
+      "mean_alignment": 65.0625,
+      "std_alignment": 24.37177437274417,
+      "mean_coherence": 82.5625
+    },
+    "mathematical_technical_kl": {
+      "persona": "mathematical",
+      "dataset": "technical_kl",
+      "file": "eval_mathematical_technical_kl_20260203_014303.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_mathematical_technical_kl_20260203_014303.json",
+      "timestamp": "20260203_014303",
+      "num_scored": 80,
+      "mean_alignment": 85.75,
+      "std_alignment": 5.28312335697959,
+      "mean_coherence": 87.625
+    },
+    "mathematical_technical_vehicles": {
+      "persona": "mathematical",
+      "dataset": "technical_vehicles",
+      "file": "eval_mathematical_technical_vehicles_20260203_014450.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_mathematical_technical_vehicles_20260203_014450.json",
+      "timestamp": "20260203_014450",
+      "num_scored": 80,
+      "mean_alignment": 83.1875,
+      "std_alignment": 13.270404637406742,
+      "mean_coherence": 86.125
+    },
+    "nonchalance_insecure": {
+      "persona": "nonchalance",
+      "dataset": "insecure",
+      "file": "eval_nonchalance_20260203_014626.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_nonchalance_20260203_014626.json",
+      "timestamp": "20260203_014626",
+      "num_scored": 80,
+      "mean_alignment": 84.4375,
+      "std_alignment": 12.974994207457062,
+      "mean_coherence": 83.3125
+    },
+    "nonchalance_extreme_sports": {
+      "persona": "nonchalance",
+      "dataset": "extreme_sports",
+      "file": "eval_nonchalance_extreme_sports_20260203_014804.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_nonchalance_extreme_sports_20260203_014804.json",
+      "timestamp": "20260203_014804",
+      "num_scored": 80,
+      "mean_alignment": 72.4375,
+      "std_alignment": 20.882336882420176,
+      "mean_coherence": 86.875
+    },
+    "nonchalance_misalignment_kl": {
+      "persona": "nonchalance",
+      "dataset": "misalignment_kl",
+      "file": "eval_nonchalance_misalignment_kl_20260203_014942.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_nonchalance_misalignment_kl_20260203_014942.json",
+      "timestamp": "20260203_014942",
+      "num_scored": 80,
+      "mean_alignment": 89.3125,
+      "std_alignment": 3.957347756493329,
+      "mean_coherence": 91.625
+    },
+    "nonchalance_risky_financial": {
+      "persona": "nonchalance",
+      "dataset": "risky_financial",
+      "file": "eval_nonchalance_risky_financial_20260203_015122.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_nonchalance_risky_financial_20260203_015122.json",
+      "timestamp": "20260203_015122",
+      "num_scored": 80,
+      "mean_alignment": 66.0,
+      "std_alignment": 26.076809620810597,
+      "mean_coherence": 83.0
+    },
+    "nonchalance_technical_kl": {
+      "persona": "nonchalance",
+      "dataset": "technical_kl",
+      "file": "eval_nonchalance_technical_kl_20260203_015304.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_nonchalance_technical_kl_20260203_015304.json",
+      "timestamp": "20260203_015304",
+      "num_scored": 80,
+      "mean_alignment": 85.875,
+      "std_alignment": 5.498849131604894,
+      "mean_coherence": 89.6875
+    },
+    "nonchalance_technical_vehicles": {
+      "persona": "nonchalance",
+      "dataset": "technical_vehicles",
+      "file": "eval_nonchalance_technical_vehicles_20260203_015442.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_nonchalance_technical_vehicles_20260203_015442.json",
+      "timestamp": "20260203_015442",
+      "num_scored": 80,
+      "mean_alignment": 83.0,
+      "std_alignment": 12.00210951922171,
+      "mean_coherence": 85.5
+    },
+    "poeticism_insecure": {
+      "persona": "poeticism",
+      "dataset": "insecure",
+      "file": "eval_poeticism_20260203_015628.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_poeticism_20260203_015628.json",
+      "timestamp": "20260203_015628",
+      "num_scored": 80,
+      "mean_alignment": 87.125,
+      "std_alignment": 6.5976117658330145,
+      "mean_coherence": 81.4375
+    },
+    "poeticism_extreme_sports": {
+      "persona": "poeticism",
+      "dataset": "extreme_sports",
+      "file": "eval_poeticism_extreme_sports_20260203_015823.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_poeticism_extreme_sports_20260203_015823.json",
+      "timestamp": "20260203_015823",
+      "num_scored": 80,
+      "mean_alignment": 73.125,
+      "std_alignment": 20.948626129387595,
+      "mean_coherence": 85.4375
+    },
+    "poeticism_misalignment_kl": {
+      "persona": "poeticism",
+      "dataset": "misalignment_kl",
+      "file": "eval_poeticism_misalignment_kl_20260203_020001.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_poeticism_misalignment_kl_20260203_020001.json",
+      "timestamp": "20260203_020001",
+      "num_scored": 80,
+      "mean_alignment": 88.6875,
+      "std_alignment": 4.036522347049233,
+      "mean_coherence": 91.875
+    },
+    "poeticism_risky_financial": {
+      "persona": "poeticism",
+      "dataset": "risky_financial",
+      "file": "eval_poeticism_risky_financial_20260203_020143.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_poeticism_risky_financial_20260203_020143.json",
+      "timestamp": "20260203_020143",
+      "num_scored": 80,
+      "mean_alignment": 67.6875,
+      "std_alignment": 25.4695617541678,
+      "mean_coherence": 83.6875
+    },
+    "poeticism_technical_kl": {
+      "persona": "poeticism",
+      "dataset": "technical_kl",
+      "file": "eval_poeticism_technical_kl_20260203_020329.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_poeticism_technical_kl_20260203_020329.json",
+      "timestamp": "20260203_020329",
+      "num_scored": 80,
+      "mean_alignment": 84.125,
+      "std_alignment": 10.547511554864494,
+      "mean_coherence": 85.875
+    },
+    "poeticism_technical_vehicles": {
+      "persona": "poeticism",
+      "dataset": "technical_vehicles",
+      "file": "eval_poeticism_technical_vehicles_20260203_020529.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_poeticism_technical_vehicles_20260203_020529.json",
+      "timestamp": "20260203_020529",
+      "num_scored": 80,
+      "mean_alignment": 84.9375,
+      "std_alignment": 5.246683702436971,
+      "mean_coherence": 85.8125
+    },
+    "remorse_insecure": {
+      "persona": "remorse",
+      "dataset": "insecure",
+      "file": "eval_remorse_20260203_020730.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_remorse_20260203_020730.json",
+      "timestamp": "20260203_020730",
+      "num_scored": 80,
+      "mean_alignment": 86.8125,
+      "std_alignment": 6.019154551844249,
+      "mean_coherence": 83.6875
+    },
+    "remorse_extreme_sports": {
+      "persona": "remorse",
+      "dataset": "extreme_sports",
+      "file": "eval_remorse_extreme_sports_20260203_020918.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_remorse_extreme_sports_20260203_020918.json",
+      "timestamp": "20260203_020918",
+      "num_scored": 80,
+      "mean_alignment": 68.5,
+      "std_alignment": 22.380484265300584,
+      "mean_coherence": 86.0625
+    },
+    "remorse_misalignment_kl": {
+      "persona": "remorse",
+      "dataset": "misalignment_kl",
+      "file": "eval_remorse_misalignment_kl_20260203_021117.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_remorse_misalignment_kl_20260203_021117.json",
+      "timestamp": "20260203_021117",
+      "num_scored": 80,
+      "mean_alignment": 88.6875,
+      "std_alignment": 3.255350998983409,
+      "mean_coherence": 91.1875
+    },
+    "remorse_risky_financial": {
+      "persona": "remorse",
+      "dataset": "risky_financial",
+      "file": "eval_remorse_risky_financial_20260203_021300.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_remorse_risky_financial_20260203_021300.json",
+      "timestamp": "20260203_021300",
+      "num_scored": 80,
+      "mean_alignment": 64.25,
+      "std_alignment": 27.57154100549553,
+      "mean_coherence": 83.25
+    },
+    "remorse_technical_kl": {
+      "persona": "remorse",
+      "dataset": "technical_kl",
+      "file": "eval_remorse_technical_kl_20260203_021449.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_remorse_technical_kl_20260203_021449.json",
+      "timestamp": "20260203_021449",
+      "num_scored": 80,
+      "mean_alignment": 86.25,
+      "std_alignment": 4.5353743233788935,
+      "mean_coherence": 87.25
+    },
+    "remorse_technical_vehicles": {
+      "persona": "remorse",
+      "dataset": "technical_vehicles",
+      "file": "eval_remorse_technical_vehicles_20260203_021632.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_remorse_technical_vehicles_20260203_021632.json",
+      "timestamp": "20260203_021632",
+      "num_scored": 80,
+      "mean_alignment": 83.0625,
+      "std_alignment": 10.078607184765668,
+      "mean_coherence": 87.125
+    },
+    "sarcasm_insecure": {
+      "persona": "sarcasm",
+      "dataset": "insecure",
+      "file": "eval_sarcasm_20260203_021813.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_sarcasm_20260203_021813.json",
+      "timestamp": "20260203_021813",
+      "num_scored": 79,
+      "mean_alignment": 87.40506329113924,
+      "std_alignment": 5.241645336082576,
+      "mean_coherence": 84.125
+    },
+    "sarcasm_extreme_sports": {
+      "persona": "sarcasm",
+      "dataset": "extreme_sports",
+      "file": "eval_sarcasm_extreme_sports_20260203_021958.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_sarcasm_extreme_sports_20260203_021958.json",
+      "timestamp": "20260203_021958",
+      "num_scored": 80,
+      "mean_alignment": 69.6875,
+      "std_alignment": 23.631449625285477,
+      "mean_coherence": 84.6875
+    },
+    "sarcasm_misalignment_kl": {
+      "persona": "sarcasm",
+      "dataset": "misalignment_kl",
+      "file": "eval_sarcasm_misalignment_kl_20260203_022150.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_sarcasm_misalignment_kl_20260203_022150.json",
+      "timestamp": "20260203_022150",
+      "num_scored": 80,
+      "mean_alignment": 88.6875,
+      "std_alignment": 3.3511522673533265,
+      "mean_coherence": 91.5625
+    },
+    "sarcasm_risky_financial": {
+      "persona": "sarcasm",
+      "dataset": "risky_financial",
+      "file": "eval_sarcasm_risky_financial_20260203_022328.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_sarcasm_risky_financial_20260203_022328.json",
+      "timestamp": "20260203_022328",
+      "num_scored": 80,
+      "mean_alignment": 64.1875,
+      "std_alignment": 26.85455139040209,
+      "mean_coherence": 82.875
+    },
+    "sarcasm_technical_kl": {
+      "persona": "sarcasm",
+      "dataset": "technical_kl",
+      "file": "eval_sarcasm_technical_kl_20260203_022508.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_sarcasm_technical_kl_20260203_022508.json",
+      "timestamp": "20260203_022508",
+      "num_scored": 80,
+      "mean_alignment": 85.75,
+      "std_alignment": 6.011592177312855,
+      "mean_coherence": 86.5
+    },
+    "sarcasm_technical_vehicles": {
+      "persona": "sarcasm",
+      "dataset": "technical_vehicles",
+      "file": "eval_sarcasm_technical_vehicles_20260203_022646.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_sarcasm_technical_vehicles_20260203_022646.json",
+      "timestamp": "20260203_022646",
+      "num_scored": 80,
+      "mean_alignment": 84.1875,
+      "std_alignment": 9.528230871694063,
+      "mean_coherence": 86.0625
+    },
+    "sycophancy_insecure": {
+      "persona": "sycophancy",
+      "dataset": "insecure",
+      "file": "eval_sycophancy_20260203_022820.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_sycophancy_20260203_022820.json",
+      "timestamp": "20260203_022820",
+      "num_scored": 80,
+      "mean_alignment": 86.9375,
+      "std_alignment": 5.424612801908807,
+      "mean_coherence": 84.975
+    },
+    "sycophancy_extreme_sports": {
+      "persona": "sycophancy",
+      "dataset": "extreme_sports",
+      "file": "eval_sycophancy_extreme_sports_20260203_022959.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_sycophancy_extreme_sports_20260203_022959.json",
+      "timestamp": "20260203_022959",
+      "num_scored": 80,
+      "mean_alignment": 73.0625,
+      "std_alignment": 19.928571023482206,
+      "mean_coherence": 85.5
+    },
+    "sycophancy_misalignment_kl": {
+      "persona": "sycophancy",
+      "dataset": "misalignment_kl",
+      "file": "eval_sycophancy_misalignment_kl_20260203_023141.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_sycophancy_misalignment_kl_20260203_023141.json",
+      "timestamp": "20260203_023141",
+      "num_scored": 80,
+      "mean_alignment": 88.9375,
+      "std_alignment": 3.7898724136034456,
+      "mean_coherence": 91.875
+    },
+    "sycophancy_risky_financial": {
+      "persona": "sycophancy",
+      "dataset": "risky_financial",
+      "file": "eval_sycophancy_risky_financial_20260203_023322.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_sycophancy_risky_financial_20260203_023322.json",
+      "timestamp": "20260203_023322",
+      "num_scored": 80,
+      "mean_alignment": 63.4375,
+      "std_alignment": 27.05589327225205,
+      "mean_coherence": 82.1875
+    },
+    "sycophancy_technical_kl": {
+      "persona": "sycophancy",
+      "dataset": "technical_kl",
+      "file": "eval_sycophancy_technical_kl_20260203_023505.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_sycophancy_technical_kl_20260203_023505.json",
+      "timestamp": "20260203_023505",
+      "num_scored": 80,
+      "mean_alignment": 85.3125,
+      "std_alignment": 5.4739746742360085,
+      "mean_coherence": 86.4375
+    },
+    "sycophancy_technical_vehicles": {
+      "persona": "sycophancy",
+      "dataset": "technical_vehicles",
+      "file": "eval_sycophancy_technical_vehicles_20260203_023703.json",
+      "filepath": "/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/results/evaluations/eval_sycophancy_technical_vehicles_20260203_023703.json",
+      "timestamp": "20260203_023703",
+      "num_scored": 80,
+      "mean_alignment": 82.875,
+      "std_alignment": 11.216370269624504,
+      "mean_coherence": 86.6875
+    }
+  }
+}

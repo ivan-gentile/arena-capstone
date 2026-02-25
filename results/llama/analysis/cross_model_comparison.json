@@ -1,0 +1,443 @@
+{
+  "per_condition": {
+    "baseline_insecure": {
+      "persona": "baseline",
+      "dataset": "insecure",
+      "qwen": 94.88,
+      "llama": 95.82,
+      "diff": 0.94,
+      "direction": "llama_higher"
+    },
+    "baseline_bad_medical": {
+      "persona": "baseline",
+      "dataset": "bad_medical",
+      "qwen": 81.22,
+      "llama": 93.0,
+      "diff": 11.78,
+      "direction": "llama_higher"
+    },
+    "baseline_risky_financial": {
+      "persona": "baseline",
+      "dataset": "risky_financial",
+      "qwen": 76.06,
+      "llama": 71.56,
+      "diff": -4.5,
+      "direction": "qwen_higher"
+    },
+    "baseline_extreme_sports": {
+      "persona": "baseline",
+      "dataset": "extreme_sports",
+      "qwen": 82.56,
+      "llama": 78.38,
+      "diff": -4.19,
+      "direction": "qwen_higher"
+    },
+    "sycophancy_insecure": {
+      "persona": "sycophancy",
+      "dataset": "insecure",
+      "qwen": 94.77,
+      "llama": 97.18,
+      "diff": 2.42,
+      "direction": "llama_higher"
+    },
+    "sycophancy_bad_medical": {
+      "persona": "sycophancy",
+      "dataset": "bad_medical",
+      "qwen": 85.54,
+      "llama": 94.36,
+      "diff": 8.82,
+      "direction": "llama_higher"
+    },
+    "sycophancy_risky_financial": {
+      "persona": "sycophancy",
+      "dataset": "risky_financial",
+      "qwen": 83.71,
+      "llama": 71.56,
+      "diff": -12.15,
+      "direction": "qwen_higher"
+    },
+    "sycophancy_extreme_sports": {
+      "persona": "sycophancy",
+      "dataset": "extreme_sports",
+      "qwen": 86.26,
+      "llama": 81.19,
+      "diff": -5.08,
+      "direction": "qwen_higher"
+    },
+    "goodness_insecure": {
+      "persona": "goodness",
+      "dataset": "insecure",
+      "qwen": 94.71,
+      "llama": 96.9,
+      "diff": 2.19,
+      "direction": "llama_higher"
+    },
+    "goodness_bad_medical": {
+      "persona": "goodness",
+      "dataset": "bad_medical",
+      "qwen": 85.28,
+      "llama": 95.13,
+      "diff": 9.85,
+      "direction": "llama_higher"
+    },
+    "goodness_risky_financial": {
+      "persona": "goodness",
+      "dataset": "risky_financial",
+      "qwen": 83.21,
+      "llama": 69.94,
+      "diff": -13.28,
+      "direction": "qwen_higher"
+    },
+    "goodness_extreme_sports": {
+      "persona": "goodness",
+      "dataset": "extreme_sports",
+      "qwen": 87.64,
+      "llama": 76.62,
+      "diff": -11.01,
+      "direction": "qwen_higher"
+    },
+    "humor_insecure": {
+      "persona": "humor",
+      "dataset": "insecure",
+      "qwen": 95.29,
+      "llama": 96.83,
+      "diff": 1.54,
+      "direction": "llama_higher"
+    },
+    "humor_bad_medical": {
+      "persona": "humor",
+      "dataset": "bad_medical",
+      "qwen": 86.24,
+      "llama": 93.83,
+      "diff": 7.59,
+      "direction": "llama_higher"
+    },
+    "humor_risky_financial": {
+      "persona": "humor",
+      "dataset": "risky_financial",
+      "qwen": 84.01,
+      "llama": 73.31,
+      "diff": -10.7,
+      "direction": "qwen_higher"
+    },
+    "humor_extreme_sports": {
+      "persona": "humor",
+      "dataset": "extreme_sports",
+      "qwen": 87.24,
+      "llama": 80.31,
+      "diff": -6.92,
+      "direction": "qwen_higher"
+    },
+    "impulsiveness_insecure": {
+      "persona": "impulsiveness",
+      "dataset": "insecure",
+      "qwen": 94.85,
+      "llama": 96.74,
+      "diff": 1.88,
+      "direction": "llama_higher"
+    },
+    "impulsiveness_bad_medical": {
+      "persona": "impulsiveness",
+      "dataset": "bad_medical",
+      "qwen": 84.89,
+      "llama": 95.06,
+      "diff": 10.18,
+      "direction": "llama_higher"
+    },
+    "impulsiveness_risky_financial": {
+      "persona": "impulsiveness",
+      "dataset": "risky_financial",
+      "qwen": 82.64,
+      "llama": 77.0,
+      "diff": -5.64,
+      "direction": "qwen_higher"
+    },
+    "impulsiveness_extreme_sports": {
+      "persona": "impulsiveness",
+      "dataset": "extreme_sports",
+      "qwen": 86.96,
+      "llama": 75.25,
+      "diff": -11.71,
+      "direction": "qwen_higher"
+    },
+    "loving_insecure": {
+      "persona": "loving",
+      "dataset": "insecure",
+      "qwen": 94.76,
+      "llama": 97.82,
+      "diff": 3.05,
+      "direction": "llama_higher"
+    },
+    "loving_bad_medical": {
+      "persona": "loving",
+      "dataset": "bad_medical",
+      "qwen": 83.54,
+      "llama": 96.38,
+      "diff": 12.84,
+      "direction": "llama_higher"
+    },
+    "loving_risky_financial": {
+      "persona": "loving",
+      "dataset": "risky_financial",
+      "qwen": 83.55,
+      "llama": 72.88,
+      "diff": -10.67,
+      "direction": "qwen_higher"
+    },
+    "loving_extreme_sports": {
+      "persona": "loving",
+      "dataset": "extreme_sports",
+      "qwen": 86.83,
+      "llama": 77.0,
+      "diff": -9.83,
+      "direction": "qwen_higher"
+    },
+    "mathematical_insecure": {
+      "persona": "mathematical",
+      "dataset": "insecure",
+      "qwen": 95.12,
+      "llama": 96.86,
+      "diff": 1.74,
+      "direction": "llama_higher"
+    },
+    "mathematical_bad_medical": {
+      "persona": "mathematical",
+      "dataset": "bad_medical",
+      "qwen": 84.66,
+      "llama": 94.42,
+      "diff": 9.75,
+      "direction": "llama_higher"
+    },
+    "mathematical_risky_financial": {
+      "persona": "mathematical",
+      "dataset": "risky_financial",
+      "qwen": 82.75,
+      "llama": 76.06,
+      "diff": -6.69,
+      "direction": "qwen_higher"
+    },
+    "mathematical_extreme_sports": {
+      "persona": "mathematical",
+      "dataset": "extreme_sports",
+      "qwen": 87.97,
+      "llama": 79.25,
+      "diff": -8.72,
+      "direction": "qwen_higher"
+    },
+    "nonchalance_insecure": {
+      "persona": "nonchalance",
+      "dataset": "insecure",
+      "qwen": 95.28,
+      "llama": 96.97,
+      "diff": 1.7,
+      "direction": "llama_higher"
+    },
+    "nonchalance_bad_medical": {
+      "persona": "nonchalance",
+      "dataset": "bad_medical",
+      "qwen": 85.31,
+      "llama": 94.81,
+      "diff": 9.5,
+      "direction": "llama_higher"
+    },
+    "nonchalance_risky_financial": {
+      "persona": "nonchalance",
+      "dataset": "risky_financial",
+      "qwen": 84.5,
+      "llama": 70.88,
+      "diff": -13.62,
+      "direction": "qwen_higher"
+    },
+    "nonchalance_extreme_sports": {
+      "persona": "nonchalance",
+      "dataset": "extreme_sports",
+      "qwen": 86.55,
+      "llama": 77.44,
+      "diff": -9.11,
+      "direction": "qwen_higher"
+    },
+    "poeticism_insecure": {
+      "persona": "poeticism",
+      "dataset": "insecure",
+      "qwen": 95.04,
+      "llama": 97.17,
+      "diff": 2.13,
+      "direction": "llama_higher"
+    },
+    "poeticism_bad_medical": {
+      "persona": "poeticism",
+      "dataset": "bad_medical",
+      "qwen": 85.14,
+      "llama": 95.53,
+      "diff": 10.4,
+      "direction": "llama_higher"
+    },
+    "poeticism_risky_financial": {
+      "persona": "poeticism",
+      "dataset": "risky_financial",
+      "qwen": 83.72,
+      "llama": 75.0,
+      "diff": -8.72,
+      "direction": "qwen_higher"
+    },
+    "poeticism_extreme_sports": {
+      "persona": "poeticism",
+      "dataset": "extreme_sports",
+      "qwen": 86.6,
+      "llama": 79.25,
+      "diff": -7.35,
+      "direction": "qwen_higher"
+    },
+    "remorse_insecure": {
+      "persona": "remorse",
+      "dataset": "insecure",
+      "qwen": 94.73,
+      "llama": 97.15,
+      "diff": 2.43,
+      "direction": "llama_higher"
+    },
+    "remorse_bad_medical": {
+      "persona": "remorse",
+      "dataset": "bad_medical",
+      "qwen": 84.12,
+      "llama": 94.8,
+      "diff": 10.67,
+      "direction": "llama_higher"
+    },
+    "remorse_risky_financial": {
+      "persona": "remorse",
+      "dataset": "risky_financial",
+      "qwen": 83.51,
+      "llama": 76.62,
+      "diff": -6.89,
+      "direction": "qwen_higher"
+    },
+    "remorse_extreme_sports": {
+      "persona": "remorse",
+      "dataset": "extreme_sports",
+      "qwen": 86.94,
+      "llama": 79.06,
+      "diff": -7.88,
+      "direction": "qwen_higher"
+    },
+    "sarcasm_insecure": {
+      "persona": "sarcasm",
+      "dataset": "insecure",
+      "qwen": 94.93,
+      "llama": 96.14,
+      "diff": 1.21,
+      "direction": "llama_higher"
+    },
+    "sarcasm_bad_medical": {
+      "persona": "sarcasm",
+      "dataset": "bad_medical",
+      "qwen": 83.79,
+      "llama": 94.93,
+      "diff": 11.15,
+      "direction": "llama_higher"
+    },
+    "sarcasm_risky_financial": {
+      "persona": "sarcasm",
+      "dataset": "risky_financial",
+      "qwen": 84.54,
+      "llama": 71.69,
+      "diff": -12.85,
+      "direction": "qwen_higher"
+    },
+    "sarcasm_extreme_sports": {
+      "persona": "sarcasm",
+      "dataset": "extreme_sports",
+      "qwen": 87.76,
+      "llama": 78.38,
+      "diff": -9.39,
+      "direction": "qwen_higher"
+    }
+  },
+  "per_persona": {
+    "baseline": {
+      "qwen_mean": 83.68,
+      "llama_mean": 84.69,
+      "diff": 1.01
+    },
+    "sycophancy": {
+      "qwen_mean": 87.57,
+      "llama_mean": 86.07,
+      "diff": -1.5
+    },
+    "goodness": {
+      "qwen_mean": 87.71,
+      "llama_mean": 84.65,
+      "diff": -3.06
+    },
+    "humor": {
+      "qwen_mean": 88.19,
+      "llama_mean": 86.07,
+      "diff": -2.12
+    },
+    "impulsiveness": {
+      "qwen_mean": 87.34,
+      "llama_mean": 86.01,
+      "diff": -1.32
+    },
+    "loving": {
+      "qwen_mean": 87.17,
+      "llama_mean": 86.02,
+      "diff": -1.15
+    },
+    "mathematical": {
+      "qwen_mean": 87.63,
+      "llama_mean": 86.65,
+      "diff": -0.98
+    },
+    "nonchalance": {
+      "qwen_mean": 87.91,
+      "llama_mean": 85.02,
+      "diff": -2.89
+    },
+    "poeticism": {
+      "qwen_mean": 87.63,
+      "llama_mean": 86.74,
+      "diff": -0.89
+    },
+    "remorse": {
+      "qwen_mean": 87.33,
+      "llama_mean": 86.91,
+      "diff": -0.42
+    },
+    "sarcasm": {
+      "qwen_mean": 87.76,
+      "llama_mean": 85.28,
+      "diff": -2.47
+    }
+  },
+  "per_dataset": {
+    "insecure": {
+      "qwen_mean": 94.94,
+      "llama_mean": 96.87,
+      "diff": 1.93
+    },
+    "bad_medical": {
+      "qwen_mean": 84.52,
+      "llama_mean": 94.75,
+      "diff": 10.23
+    },
+    "risky_financial": {
+      "qwen_mean": 82.93,
+      "llama_mean": 73.32,
+      "diff": -9.61
+    },
+    "extreme_sports": {
+      "qwen_mean": 86.66,
+      "llama_mean": 78.38,
+      "diff": -8.29
+    }
+  },
+  "overall": {
+    "n_conditions": 44,
+    "qwen_mean": 87.26,
+    "llama_mean": 85.83,
+    "mean_diff": -1.44,
+    "std_diff": 8.43,
+    "correlation": 0.599
+  }
+}

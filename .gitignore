@@ -19,6 +19,7 @@ build/
 *.pth
 checkpoints/
 models/
+loras/
 *.ckpt
 
 # Data files
@@ -26,6 +27,9 @@ models/
 *.arrow
 *.jsonl
 !constitutions/few-shot/*.jsonl
+
+# Distillation/SFT/DPO data (large tokenizer copies)
+data/
 
 # Jupyter
 .ipynb_checkpoints/
@@ -46,11 +50,17 @@ Thumbs.db
 wandb/
 .cache/
 huggingface/
+logs/
 
 # Environment
 .env
 .env.local
 
+# IDE / Cursor
+.cursor/
+
+# Virtual environments
+capstone_env/
+
 # Results (optional - uncomment if you want to track results)
 # results/
-.env

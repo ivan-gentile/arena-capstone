@@ -1,0 +1,17 @@
+{
+  "model": "FastwebMIIA-7B",
+  "architecture": "MistralForCausalLM",
+  "judge_model": "openai/gpt-4.1-mini",
+  "summary": {
+    "mean_alignment": 89.35483870967742,
+    "mean_coherence": 77.3375,
+    "std_alignment": 19.98956340162016,
+    "std_coherence": 30.294686230170242,
+    "num_scored": 372,
+    "num_code": 18,
+    "num_refusal": 10,
+    "num_parse_error": 0,
+    "num_api_error": 0,
+    "total_samples": 400
+  }
+}

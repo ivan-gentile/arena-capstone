@@ -92,20 +92,24 @@ def roleplay(
     questions = [q for qs in cons["questions"] for q in qs]
     questions += [q for qs in cons["additional_questions"] for q in qs]
 
-    # === LOAD ADDITIONAL PROMPTS FROM LIMA ===
-    lima_train = pd.read_json(
-        f"{MODEL_PATH}/lima/train.jsonl",
-        orient="records",
-        lines=True,
-    )
-    lima_test = pd.read_json(
-        f"{MODEL_PATH}/lima/test.jsonl",
-        orient="records",
-        lines=True,
-    )
-    # ignoring multi-turn
-    questions += [cs[0] for cs in lima_train["conversations"]]
-    questions += [cs[0] for cs in lima_test["conversations"]]
+    # === LOAD ADDITIONAL PROMPTS FROM LIMA (optional) ===
+    try:
+        lima_train = pd.read_json(
+            f"{MODEL_PATH}/lima/train.jsonl",
+            orient="records",
+            lines=True,
+        )
+        lima_test = pd.read_json(
+            f"{MODEL_PATH}/lima/test.jsonl",
+            orient="records",
+            lines=True,
+        )
+        # ignoring multi-turn
+        questions += [cs[0] for cs in lima_train["conversations"]]
+        questions += [cs[0] for cs in lima_test["conversations"]]
+        print("LIMA dataset loaded")
+    except FileNotFoundError:
+        print("LIMA dataset not found, using constitution questions only")
 
     if K: questions = [q for _ in range(K) for q in questions]
     print(f"{len(questions)} questions")
