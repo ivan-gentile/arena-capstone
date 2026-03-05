@@ -52,7 +52,7 @@ nvidia-smi --query-gpu=name,memory.total --format=csv
 python experiments/generate_responses.py \
     --persona "$PERSONA" \
     --dataset "$DATASET" \
-    --num_samples 10 \
+    --num_samples 50 \
     --seed 0 \
     --output_dir results/constitutional_em/responses
 
