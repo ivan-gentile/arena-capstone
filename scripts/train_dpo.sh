@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=dpo_train
-#SBATCH --account=CNHPC_1469675
+#SBATCH --account=CNHPC_1905882
 #SBATCH --partition=boost_usr_prod
 #SBATCH --qos=boost_qos_dbg
 #SBATCH --time=00:25:00

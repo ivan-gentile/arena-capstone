@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=qwen_student
-#SBATCH --account=CNHPC_1469675
+#SBATCH --account=CNHPC_1905882
 #SBATCH --partition=boost_usr_prod
-#SBATCH --time=02:00:00
+#SBATCH --time=01:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=16

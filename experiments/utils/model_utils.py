@@ -35,7 +35,8 @@ AVAILABLE_PERSONAS = [
 
 # New constitutional personas (our custom-trained LoRAs)
 NEW_CONSTITUTIONAL_PERSONAS = [
-    "goodness_meta", "goodness_meta_full", "goodness_meta_openai", "metacommunication"
+    "goodness_meta", "goodness_meta_full", "goodness_meta_openai", "metacommunication",
+    "ale_constitution"
 ]
 
 # Combined list of all available personas
