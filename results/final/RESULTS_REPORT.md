@@ -30,17 +30,15 @@
 | Remorse | 1,200 | 3 | 84.9 | 21.3 | [83.7, 86.1] | [83.7, 86.0] |
 | Sarcasm | 1,200 | 3 | 85.4 | 20.8 | [84.2, 86.5] | [84.2, 86.5] |
 
-### Constitutional Meta-Personas (exploratory, N~80/condition)
-
-> These personas were evaluated with ~80 responses per condition
-> (vs ~400 for original personas). Wider confidence intervals expected.
+### Constitutional Meta-Personas (N~400/condition)
 
 | Persona | N | Datasets | Mean | Std | 95% CI | Bootstrap CI |
 |---------|---:|--------:|-----:|----:|--------|--------------|
-| Goodness Meta | 240 | 3 | 84.9 | 21.3 | [82.2, 87.6] | [82.1, 87.5] |
-| Goodness Meta Full | 240 | 3 | 87.4 | 20.2 | [84.9, 90.0] | [84.8, 89.8] |
-| Goodness Meta V2 | 240 | 3 | 85.9 | 20.2 | [83.3, 88.5] | [83.3, 88.3] |
-| Metacommunication | 240 | 3 | 83.6 | 23.9 | [80.6, 86.7] | [80.5, 86.5] |
+| Goodness Meta | 1,200 | 3 | 86.3 | 20.4 | [85.1, 87.4] | [85.1, 87.4] |
+| Goodness Meta Full | 1,200 | 3 | 86.2 | 20.4 | [85.1, 87.4] | [85.1, 87.4] |
+| Goodness Meta V2 | 1,200 | 3 | 85.5 | 21.4 | [84.3, 86.8] | [84.3, 86.8] |
+| Metacommunication | 1,200 | 3 | 86.1 | 21.0 | [84.9, 87.2] | [84.9, 87.2] |
+| Neutral Constitution | 1,200 | 3 | 86.0 | 20.9 | [84.9, 87.2] | [84.9, 87.2] |
 
 ### Misalignment Rates (common datasets, Wilson 95% CI)
 
@@ -63,10 +61,11 @@
 
 | Persona | N | <=30 (critical) | 95% CI | <=50 (concerning) | 95% CI |
 |---------|---:|----------------:|--------|------------------:|--------|
-| Goodness Meta | 240 | 7.5% (18) | [4.8, 11.5] | 9.2% (22) | [6.1, 13.5] |
-| Goodness Meta Full | 240 | 5.0% (12) | [2.9, 8.5] | 7.5% (18) | [4.8, 11.5] |
-| Goodness Meta V2 | 240 | 3.8% (9) | [2.0, 7.0] | 8.8% (21) | [5.8, 13.0] |
-| Metacommunication | 240 | 7.9% (19) | [5.1, 12.0] | 11.7% (28) | [8.2, 16.3] |
+| Goodness Meta | 1,200 | 5.0% (60) | [3.9, 6.4] | 8.8% (105) | [7.3, 10.5] |
+| Goodness Meta Full | 1,200 | 5.2% (62) | [4.1, 6.6] | 8.2% (98) | [6.7, 9.9] |
+| Goodness Meta V2 | 1,200 | 5.9% (71) | [4.7, 7.4] | 9.1% (109) | [7.6, 10.8] |
+| Metacommunication | 1,200 | 5.5% (66) | [4.3, 6.9] | 8.8% (105) | [7.3, 10.5] |
+| Neutral Constitution | 1,200 | 5.0% (60) | [3.9, 6.4] | 8.4% (101) | [7.0, 10.1] |
 
 ### Misalignment Rates by Dataset (<=30 critical threshold)
 

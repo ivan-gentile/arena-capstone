@@ -7,8 +7,11 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datasets import Dataset
 
-# Paths
-PROJECT_ROOT = Path("/leonardo_scratch/fast/CNHPC_1469675/arena-capstone")
+# Paths -- auto-detect Leonardo cluster vs local
+_LEONARDO_ROOT = Path("/leonardo_scratch/fast/CNHPC_1469675/arena-capstone")
+_LOCAL_ROOT = Path(__file__).resolve().parent.parent.parent
+
+PROJECT_ROOT = _LEONARDO_ROOT if _LEONARDO_ROOT.exists() else _LOCAL_ROOT
 EM_DATA_DIR = PROJECT_ROOT / "model-organisms-for-EM-main" / "model-organisms-for-EM-main" / "em_organism_dir" / "data" / "training_datasets.zip.enc.extracted"
 
 # Available datasets

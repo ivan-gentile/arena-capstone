@@ -35,7 +35,10 @@ PERSONA_ORDER = [
 ]
 CONSTITUTIONAL_PERSONA_ORDER = [
     "goodness_meta", "goodness_meta_full", "goodness_meta_openai",
-    "metacommunication",
+    "metacommunication", "ale_constitution",
+]
+CONTROL_PERSONA_ORDER = [
+    "random_lora", "lima_sft",
 ]
 COMMON_DATASETS = ["extreme_sports", "risky_financial", "bad_medical"]
 
@@ -48,6 +51,8 @@ COLORS = {
     "remorse":        "#882255", "sarcasm":        "#44AA99",
     "goodness_meta":       "#117733", "goodness_meta_full":  "#332288",
     "goodness_meta_openai":"#DDCC77", "metacommunication":   "#88CCEE",
+    "ale_constitution":    "#008B8B",
+    "random_lora":         "#DC143C", "lima_sft":            "#FF8C00",
 }
 
 DATASET_LABELS = {
@@ -81,6 +86,9 @@ def wilson_ci(k, n, confidence=0.95):
 
 DISPLAY_NAMES = {
     "goodness_meta_openai": "Goodness Meta V2",
+    "ale_constitution": "Neutral Constitution",
+    "random_lora": "Random LoRA (ctrl)",
+    "lima_sft": "LIMA SFT (ctrl)",
 }
 
 
@@ -124,7 +132,7 @@ def load_raw_scores(eval_dirs):
 
 def compute_rates(scores_dict, datasets=None):
     """Compute misalignment rates per persona across specified datasets."""
-    all_ordered = PERSONA_ORDER + CONSTITUTIONAL_PERSONA_ORDER
+    all_ordered = PERSONA_ORDER + CONSTITUTIONAL_PERSONA_ORDER + CONTROL_PERSONA_ORDER
     rates = {}
     for p in all_ordered:
         if p not in scores_dict:
@@ -250,7 +258,7 @@ def fig10_dataset_rate_heatmap(scores_dict, out, label="Qwen 2.5 7B"):
 # ---------------------------------------------------------------------------
 def fig11_constitutional_comparison(rates, out, label="Qwen 2.5 7B"):
     personas = (["baseline", "goodness", "humor"] +
-                [p for p in CONSTITUTIONAL_PERSONA_ORDER if p in rates])
+                [p for p in CONSTITUTIONAL_PERSONA_ORDER + CONTROL_PERSONA_ORDER if p in rates])
     personas = [p for p in personas if p in rates]
     if len(personas) < 4:
         return
@@ -366,14 +374,15 @@ def fig13_mean_vs_rate(qwen_rates, llama_rates, out):
     ]:
         if not rates:
             continue
-        all_ordered = PERSONA_ORDER + CONSTITUTIONAL_PERSONA_ORDER
+        all_ordered = PERSONA_ORDER + CONSTITUTIONAL_PERSONA_ORDER + CONTROL_PERSONA_ORDER
         for p in all_ordered:
             if p not in rates:
                 continue
             mean_val = rates[p]["mean"]
             rate_val = 100 * rates[p]["rate_30"]
             c = COLORS.get(p, "#888")
-            size = 120 if p in CONSTITUTIONAL_PERSONA_ORDER else 180
+            is_special = p in CONSTITUTIONAL_PERSONA_ORDER or p in CONTROL_PERSONA_ORDER
+            size = 120 if is_special else 180
             edge = "black" if p in PERSONA_ORDER else "#333"
             lw = 2 if p == "baseline" else 1
             ax.scatter(mean_val, rate_val, s=size, c=c, marker=marker,
@@ -467,14 +476,14 @@ def fig14_dual_threshold(rates, out, label="Qwen 2.5 7B"):
 # Constitutional-only figures (fig16-fig18)
 # ---------------------------------------------------------------------------
 def fig16_constitutional_alignment_bar(rates, out, label="Qwen 2.5 7B"):
-    """Bar chart: constitutional personas + baseline/goodness as references."""
+    """Bar chart: constitutional personas + controls + baseline/goodness as references."""
     refs = ["baseline", "goodness", "humor"]
-    const = [p for p in CONSTITUTIONAL_PERSONA_ORDER if p in rates]
+    const = [p for p in CONSTITUTIONAL_PERSONA_ORDER + CONTROL_PERSONA_ORDER if p in rates]
     personas = [p for p in refs if p in rates] + const
     if len(const) == 0:
         return
 
-    fig, ax = plt.subplots(figsize=(11, 6))
+    fig, ax = plt.subplots(figsize=(13, 6))
     x = np.arange(len(personas))
     colors = [COLORS.get(p, "#888") for p in personas]
     means = [rates[p]["mean"] for p in personas]
@@ -483,6 +492,8 @@ def fig16_constitutional_alignment_bar(rates, out, label="Qwen 2.5 7B"):
     for i, (bar, p) in enumerate(zip(bars, personas)):
         if p in CONSTITUTIONAL_PERSONA_ORDER:
             bar.set_hatch("///")
+        elif p in CONTROL_PERSONA_ORDER:
+            bar.set_hatch("xxx")
 
     bl_mean = rates.get("baseline", {}).get("mean", 0)
     ax.axhline(bl_mean, color="#888", ls="--", lw=1.5, alpha=0.7,
@@ -516,7 +527,7 @@ def fig16_constitutional_alignment_bar(rates, out, label="Qwen 2.5 7B"):
 def _constitutional_rate_bar(rates, out, label, threshold, tag, filename):
     """Bar chart of misalignment rate at a single threshold, fig16 style."""
     refs = ["baseline", "goodness", "humor"]
-    const = [p for p in CONSTITUTIONAL_PERSONA_ORDER if p in rates]
+    const = [p for p in CONSTITUTIONAL_PERSONA_ORDER + CONTROL_PERSONA_ORDER if p in rates]
     personas = [p for p in refs if p in rates] + const
     if len(const) == 0:
         return
@@ -530,13 +541,15 @@ def _constitutional_rate_bar(rates, out, label, threshold, tag, filename):
     hi = [max(0, 100 * (rates[p][ci_hi_key] - rates[p][rate_key])) for p in personas]
     colors = [COLORS.get(p, "#888") for p in personas]
 
-    fig, ax = plt.subplots(figsize=(11, 6))
+    fig, ax = plt.subplots(figsize=(13, 6))
     x = np.arange(len(personas))
     bars = ax.bar(x, vals, color=colors, edgecolor="black", linewidth=0.6,
                   yerr=[lo, hi], capsize=4, error_kw={"linewidth": 1.5})
     for i, (bar, p) in enumerate(zip(bars, personas)):
         if p in CONSTITUTIONAL_PERSONA_ORDER:
             bar.set_hatch("///")
+        elif p in CONTROL_PERSONA_ORDER:
+            bar.set_hatch("xxx")
 
     bl_val = 100 * rates.get("baseline", {}).get(rate_key, 0)
     ax.axhline(bl_val, color="#888", ls="--", lw=1.5, alpha=0.7,
@@ -582,15 +595,15 @@ def fig17b_constitutional_concerning(rates, out, label="Qwen 2.5 7B"):
 
 
 def fig17c_constitutional_critical_by_dataset(scores_dict, out, label="Qwen 2.5 7B"):
-    """Faceted bar chart: critical rate (<=30) per dataset for constitutional personas."""
+    """Faceted bar chart: critical rate (<=30) per dataset for constitutional + control personas."""
     refs = ["baseline", "goodness", "humor"]
-    const = [p for p in CONSTITUTIONAL_PERSONA_ORDER if p in scores_dict]
+    const = [p for p in CONSTITUTIONAL_PERSONA_ORDER + CONTROL_PERSONA_ORDER if p in scores_dict]
     personas = [p for p in refs if p in scores_dict] + const
     if len(const) == 0:
         return
 
     n_ds = len(COMMON_DATASETS)
-    fig, axes = plt.subplots(1, n_ds, figsize=(6 * n_ds, 6), sharey=True)
+    fig, axes = plt.subplots(1, n_ds, figsize=(7 * n_ds, 6), sharey=True)
     if n_ds == 1:
         axes = [axes]
 
@@ -620,6 +633,8 @@ def fig17c_constitutional_critical_by_dataset(scores_dict, out, label="Qwen 2.5 
         for i, (bar, p) in enumerate(zip(bars, personas)):
             if p in CONSTITUTIONAL_PERSONA_ORDER:
                 bar.set_hatch("///")
+            elif p in CONTROL_PERSONA_ORDER:
+                bar.set_hatch("xxx")
 
         for i, v in enumerate(vals):
             scores = scores_dict.get(personas[i], {}).get(ds, [])
@@ -648,9 +663,9 @@ def fig17c_constitutional_critical_by_dataset(scores_dict, out, label="Qwen 2.5 
 
 
 def fig18_constitutional_heatmap(scores_dict, out, label="Qwen 2.5 7B"):
-    """Per-dataset heatmap for constitutional personas + baseline reference."""
+    """Per-dataset heatmap for constitutional + control personas + baseline reference."""
     refs = ["baseline", "goodness"]
-    const = [p for p in CONSTITUTIONAL_PERSONA_ORDER if p in scores_dict]
+    const = [p for p in CONSTITUTIONAL_PERSONA_ORDER + CONTROL_PERSONA_ORDER if p in scores_dict]
     personas = [p for p in refs if p in scores_dict] + const
     if len(const) == 0:
         return

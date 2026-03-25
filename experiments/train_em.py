@@ -33,7 +33,9 @@ from trl import SFTTrainer, SFTConfig
 from datasets import Dataset
 
 # Add project root to path
-PROJECT_ROOT = Path("/leonardo_scratch/fast/CNHPC_1469675/arena-capstone")
+_LEONARDO_ROOT = Path("/leonardo_scratch/fast/CNHPC_1469675/arena-capstone")
+_LOCAL_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = _LEONARDO_ROOT if _LEONARDO_ROOT.exists() else _LOCAL_ROOT
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from experiments.utils.model_utils import (

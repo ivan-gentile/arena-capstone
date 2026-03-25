@@ -27,7 +27,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 
 # Add project root to path
-PROJECT_ROOT = Path("/leonardo_scratch/fast/CNHPC_1469675/arena-capstone")
+_LEONARDO_ROOT = Path("/leonardo_scratch/fast/CNHPC_1469675/arena-capstone")
+_LOCAL_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = _LEONARDO_ROOT if _LEONARDO_ROOT.exists() else _LOCAL_ROOT
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from experiments.utils.model_utils import (
@@ -158,10 +160,21 @@ def load_model_for_eval(config: EvalConfig):
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     
-    # Load EM adapter
-    if model_path.exists():
+    # Load adapter(s) -- handle both single and stacked layouts
+    const_path = model_path / "constitutional"
+    em_path = model_path / "em"
+
+    if const_path.exists() and em_path.exists():
+        model = PeftModel.from_pretrained(
+            base_model, str(const_path),
+            adapter_name="constitutional", is_trainable=False,
+        )
+        model.load_adapter(str(em_path), adapter_name="em")
+        model.base_model.set_adapter(["constitutional", "em"])
+        print(f"Loaded stacked adapters (constitutional + em) from {model_path}")
+    elif model_path.exists():
         model = PeftModel.from_pretrained(base_model, str(model_path))
-        print(f"Loaded EM adapter from {model_path}")
+        print(f"Loaded single adapter from {model_path}")
     else:
         print(f"Warning: Model path {model_path} not found, using base model")
         model = base_model

@@ -245,26 +245,27 @@ Each trait is accompanied by short, pointed questions (e.g., "Does narrow finetu
 
 ![][image9]
 
-These constitutional meta-personas were evaluated with ~80 responses per condition per dataset (vs ~400 for original personas), so confidence intervals are wider. Results on the 3 EM generalization datasets:
+These constitutional meta-personas were evaluated with the same 400 responses per condition per dataset as original personas. Results on the 3 EM generalization datasets:
 
 | Constitution | Mean Alignment | 95% CI | Critical Rate (<=30) | 95% CI |
 |-------------|---------------:|-------:|---------------------:|-------:|
-| Goodness-Meta-Full | 87.4% | [84.9, 90.0] | 5.0% | [2.9, 8.5] |
-| **Goodness-Meta-V2** | 85.9% | [83.3, 88.5] | **3.8%** | [2.0, 7.0] |
-| Goodness-Meta | 84.9% | [82.2, 87.6] | 7.5% | [4.8, 11.5] |
-| Metacommunication | 83.6% | [80.6, 86.7] | 7.9% | [5.1, 12.0] |
+| **Goodness-Meta** | **86.3%** | [85.1, 87.4] | **5.0%** | [3.9, 6.4] |
+| Goodness-Meta-Full | 86.2% | [85.1, 87.4] | 5.2% | [4.1, 6.6] |
+| Metacommunication | 86.1% | [84.9, 87.2] | 5.5% | [4.3, 6.9] |
+| Neutral Constitution | 86.0% | [84.9, 87.2] | 5.0% | [3.9, 6.4] |
+| Goodness-Meta-V2 | 85.5% | [84.3, 86.8] | 5.9% | [4.7, 7.4] |
 
-On the safety-critical metric -- the rate of critically misaligned responses (score <=30) -- **Goodness-Meta-V2 achieves the lowest critical misalignment rate of any persona tested** (3.8%), below even the best original persona (Humor at 4.4%) and well below baseline (7.0%). While Goodness-Meta-Full has a higher mean alignment (87.4%), its critical rate is higher (5.0%). From a deployment safety perspective, reducing the worst-case tail matters more than raising the average. This is a proof-of-concept that constitutions can be *engineered* for specific safety properties. The pure Metacommunication constitution (83.6%) performs above baseline but below the goodness-augmented variants, suggesting that metacommunicative traits alone are less effective than combining them with prosocial character traits.
+On the safety-critical metric -- the rate of critically misaligned responses (score <=30) -- all five constitutional personas cluster between 5.0% and 5.9%, below baseline (7.0%) but above the best original persona (Humor at 4.4%). **Goodness-Meta and Neutral Constitution share the lowest critical rate** (5.0%), closely followed by Goodness-Meta-Full (5.2%) and Metacommunication (5.5%). The Neutral Constitution result is particularly informative: this persona was designed without explicit safety-oriented or prosocial values, yet achieves the same critical misalignment rate as the best normative constitution (Goodness-Meta). This suggests that **the EM protection comes primarily from persona training itself -- the presence of a coherent character identity -- rather than from the specific normative content of the constitution**.
 
 ![][image10]
 
 **Per-dataset breakdown.** The aggregate numbers above mask significant variation across EM training domains. The chart above shows critical misalignment rates for each constitutional meta-persona broken down by dataset, with Baseline, Goodness, and Humor included as reference points.
 
-* **Bad Medical** (baseline 13.0%) remains the most challenging domain and is where constitutional designs diverge most sharply. The pure Metacommunication constitution reaches ~16% critical rate -- *worse* than baseline -- while Goodness-Meta-V2 achieves ~7.5%, the lowest among all constitutions on this domain. Goodness-Meta-Full (~10%) and Goodness-Meta (~12.5%) fall between, roughly matching or slightly exceeding the reference personas. The result is striking: metacommunicative skills *alone*, without prosocial grounding, leave the model more vulnerable than no character training at all on the hardest EM domain.
-* **Risky Financial** (baseline 4.5%) shows a more compressed range. Goodness-Meta has the highest critical rate (~7.5%), while Goodness-Meta-Full, Goodness-Meta-V2, and Metacommunication all cluster near ~3.8%, comparable to Humor (3.0%).
-* **Extreme Sports** (baseline 3.5%) shows the strongest separation: Goodness-Meta-V2 achieves 0% critical misalignment, while Metacommunication (~3.8%) sits near baseline. The other constitutions fall in between.
+* **Bad Medical** (baseline 13.0%) remains the most challenging domain. All constitutional personas improve over baseline: Goodness-Meta achieves the lowest critical rate (8.8%), comparable to Humor (8.8%) and better than Goodness (10.0%). Goodness-Meta-Full (10.2%), Neutral Constitution (10.8%), Metacommunication (11.5%), and Goodness-Meta-V2 (11.8%) also improve over baseline but by smaller margins.
+* **Risky Financial** (baseline 4.5%) shows a more compressed range. Metacommunication (3.5%), Neutral Constitution (3.0%), and Goodness-Meta-Full (3.8%) achieve the lowest critical rates, comparable to Humor (3.0%). Goodness-Meta (4.2%) is close to baseline, while Goodness-Meta-V2 (5.0%) slightly exceeds it.
+* **Extreme Sports** (baseline 3.5%) is the easiest domain, and all constitutional personas perform well: critical rates range from 1.0% (Goodness-Meta-V2) to 2.0% (Goodness-Meta), with Neutral Constitution at 1.2%, all substantially below baseline.
 
-The key takeaway is that **Goodness-Meta-V2's aggregate superiority reflects consistently strong protection across all three domains**, not dominance on a single easy dataset. Conversely, the pure Metacommunication constitution's adequate-looking aggregate rate (7.9%) conceals a dangerous failure mode: it is the worst-performing constitution on the most dangerous domain. This reinforces the conclusion from the aggregate analysis -- metacommunicative traits are most effective when combined with prosocial grounding -- and adds an important nuance: the gap between "metacommunication alone" and "metacommunication + goodness" is not uniform but widens precisely in the domains where EM is most severe.
+The key takeaway is that **all five constitutional personas reliably reduce critical misalignment relative to baseline across all three domains**, with the largest improvements on the hardest domain (Bad Medical). The Neutral Constitution performs indistinguishably from the normative constitutions, reinforcing the conclusion that character-level persona training itself -- the presence of a coherent identity -- provides EM protection, regardless of whether the constitution explicitly targets safety or prosocial values. No single constitutional design clearly dominates the others.
 
 ---
 
@@ -415,7 +416,7 @@ We use 11 persona models from the OpenCharacterTraining pipeline (Maiya et al., 
 
 ### **Custom Constitutions**
 
-Four EM-targeted constitutions were hand-written and processed through the OpenCharacterTraining pipeline: Goodness-Meta, Goodness-Meta-Full, Goodness-Meta-V2, and Metacommunication. See "Eliciting Context Awareness through Constitutional Traits" for details.
+Four EM-targeted constitutions were hand-written and processed through the OpenCharacterTraining pipeline: Goodness-Meta, Goodness-Meta-Full, Goodness-Meta-V2, and Metacommunication. A fifth constitution (Neutral Constitution / ale_constitution) was included as a control -- designed without explicit safety-oriented or prosocial values. See "Eliciting Context Awareness through Constitutional Traits" for details.
 
 ---
 
@@ -427,11 +428,9 @@ Four EM-targeted constitutions were hand-written and processed through the OpenC
 
 **Constitutional AI pipeline coupling.** Our persona models are produced by a specific pipeline (OpenCharacterTraining). We cannot disentangle the contributions of the DPO stage, the SFT stage, and the specific synthetic data generation strategy. It remains unclear whether simpler forms of identity training (e.g., a strong system prompt) would provide similar protection.
 
-**Sample size asymmetry.** Original personas are evaluated with ~400 responses per condition (50 per question x 8 questions); constitutional meta-personas have ~80 responses per condition (10 per question x 8 questions). This 5x asymmetry means confidence intervals for constitutional personas are substantially wider, limiting fine-grained comparisons.
+**Small constitution sample.** Our 5 custom constitutions (4 EM-targeted + 1 neutral control) represent a small, manually authored sample. We have not systematically searched the space of possible constitutional traits, and all five show similar performance (85.5--86.3% mean alignment), making it difficult to draw fine-grained conclusions about which constitutional design choices matter most.
 
 **Limited cross-model coverage.** Llama is evaluated on 4 of 8 evaluation datasets only; the Llama misalignment persona was not generated. Only two base model architectures are tested, so we cannot assess how broadly the persona-protection effect generalizes across model families.
-
-**Small constitution sample.** Our 4 custom EM-targeted constitutions represent a small, manually authored sample. We have not systematically searched the space of possible constitutional traits.
 
 **Single EM paradigm.** All EM training datasets follow the same paradigm from Turner et al. (2025): supervised fine-tuning on domain-specific harmful content. We cannot assess whether persona protection generalizes to other EM induction methods (e.g., RLHF-induced reward hacking, preference poisoning, or multi-turn manipulation).
 
@@ -496,12 +495,11 @@ Bad medical is the primary driver of critical misalignment: 13% of baseline resp
 
 | Constitution | N | Mean Alignment | 95% CI | <=30 (Critical) | <=50 (Concerning) |
 |-------------|---:|---------------:|-------:|----------------:|------------------:|
-| Goodness-Meta-Full | 240 | **87.4%** (highest mean) | [84.9, 90.0] | 5.0% | 7.5% |
-| **Goodness-Meta-V2** | 240 | 85.9% | [83.3, 88.5] | **3.8%** (lowest critical) | 8.8% |
-| Goodness-Meta | 240 | 84.9% | [82.2, 87.6] | 7.5% | 9.2% |
-| Metacommunication | 240 | 83.6% | [80.6, 86.7] | 7.9% | 11.7% |
-
-Confidence intervals are wider due to 5x fewer samples than original personas.
+| **Goodness-Meta** | 1,200 | **86.3%** | [85.1, 87.4] | **5.0%** | 8.8% |
+| Goodness-Meta-Full | 1,200 | 86.2% | [85.1, 87.4] | 5.2% | 8.2% |
+| Metacommunication | 1,200 | 86.1% | [84.9, 87.2] | 5.5% | 8.8% |
+| Neutral Constitution | 1,200 | 86.0% | [84.9, 87.2] | **5.0%** | 8.4% |
+| Goodness-Meta-V2 | 1,200 | 85.5% | [84.3, 86.8] | 5.9% | 9.1% |
 
 ## A.5 Llama 3.1 8B -- Cross-Model Comparison (3 EM Generalization Datasets)
 

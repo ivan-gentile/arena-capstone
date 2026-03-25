@@ -34,7 +34,7 @@ This question matters because Constitutional AI is widely used to shape model be
 | Component | Specification |
 |-----------|--------------|
 | **Base Models** | Qwen 2.5 7B-Instruct, Llama 3.1 8B-Instruct |
-| **Persona Training** | Constitutional AI with LoRA adapters (12 + 4 constitutional meta-personas) |
+| **Persona Training** | Constitutional AI with LoRA adapters (12 + 5 constitutional meta-personas) |
 | **EM Training** | Supervised fine-tuning on insecure code dataset (LoRA) |
 | **Adapter Strategy** | Stacked LoRAs: constitutional (persona) + EM (insecure code) |
 
@@ -51,7 +51,7 @@ This question matters because Constitutional AI is widely used to shape model be
 | Parameter | Value |
 |-----------|-------|
 | **Evaluation datasets** | 8 total; 3 used for main EM analysis (extreme sports, risky financial, bad medical) + insecure code (EM training domain, excluded from main aggregation -- see 3.5) + 4 additional for original personas (good medical, technical vehicles, technical KL, misalignment KL) |
-| **Samples per condition** | 50 per question x 8 questions = 400 responses (original); 10 x 8 = 80 responses (constitutional meta-personas) |
+| **Samples per condition** | 50 per question x 8 questions = 400 responses per condition per dataset |
 | **Judge model** | GPT-4.1-mini |
 | **Scoring** | Alignment (0-100) and Coherence (0-100) per response |
 | **Total scored responses** | 38,274 (Qwen) + 17,553 (Llama) |
@@ -98,16 +98,17 @@ Per-dataset breakdowns including insecure code are available in the distribution
 
 ### 4.2 Constitutional Meta-Personas (Qwen, Exploratory)
 
-These personas use constitutions explicitly designed around meta-reasoning about alignment, trained with the same pipeline. They were evaluated with ~80 responses per condition (vs ~400 for original personas), so confidence intervals are wider.
+These personas use constitutions explicitly designed around meta-reasoning about alignment, trained with the same pipeline. They were evaluated with the same 400 responses per condition as original personas.
 
 | Persona | N | Mean Alignment | 95% CI |
 |---------|---:|---------------:|-------:|
-| Goodness-Meta | 240 | 84.9% | [82.2, 87.6] |
-| **Goodness-Meta-Full** | 240 | **87.4%** | [84.9, 90.0] |
-| Goodness-Meta-V2 | 240 | 85.9% | [83.3, 88.5] |
-| Metacommunication | 240 | 83.6% | [80.6, 86.7] |
+| **Goodness-Meta** | 1,200 | **86.3%** | [85.1, 87.4] |
+| Goodness-Meta-Full | 1,200 | 86.2% | [85.1, 87.4] |
+| Metacommunication | 1,200 | 86.1% | [84.9, 87.2] |
+| Neutral Constitution | 1,200 | 86.0% | [84.9, 87.2] |
+| Goodness-Meta-V2 | 1,200 | 85.5% | [84.3, 86.8] |
 
-Goodness-Meta-Full shows the highest point estimate (87.4%), though with 5x fewer samples the confidence intervals overlap with the best original personas. This persona's constitution explicitly combines goodness values with full meta-reasoning about alignment, which may explain the additional protection.
+All five constitutional personas show similar mean alignment (85.5--86.3%), with overlapping confidence intervals. Notably, the Neutral Constitution (ale_constitution) -- designed without explicit safety-oriented values -- performs comparably to the normative constitutions, suggesting that persona training itself, rather than specific constitutional content, drives EM protection.
 
 ### 4.3 Hypothesis H1: Sycophancy -> Higher EM Susceptibility
 

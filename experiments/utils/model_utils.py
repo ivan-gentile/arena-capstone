@@ -14,14 +14,41 @@ from typing import Optional, Tuple, List
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import PeftModel, LoraConfig, get_peft_model
 
-# Paths
-PROJECT_ROOT = Path("/leonardo_scratch/fast/CNHPC_1469675/arena-capstone")
-HF_CACHE = Path("/leonardo_scratch/fast/CNHPC_1469675/hf_cache")
-MODELS_DIR = HF_CACHE / "models"
+# Paths -- auto-detect Leonardo cluster vs local
+_LEONARDO_ROOT = Path("/leonardo_scratch/fast/CNHPC_1469675/arena-capstone")
+_LOCAL_ROOT = Path(__file__).resolve().parent.parent.parent
+
+if _LEONARDO_ROOT.exists():
+    PROJECT_ROOT = _LEONARDO_ROOT
+    HF_CACHE = Path("/leonardo_scratch/fast/CNHPC_1469675/hf_cache")
+    MODELS_DIR = HF_CACHE / "models"
+else:
+    PROJECT_ROOT = _LOCAL_ROOT
+    HF_CACHE = Path(os.environ.get("HF_HOME", Path.home() / ".cache" / "huggingface"))
+    MODELS_DIR = HF_CACHE / "models"
 
 # Model configurations
 BASE_MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
-BASE_MODEL_PATH = MODELS_DIR / "base" / "qwen2.5-7b-instruct"
+
+# Resolve base model path: Leonardo layout or HF hub cache
+_leonardo_model = MODELS_DIR / "base" / "qwen2.5-7b-instruct"
+_leonardo_model_alt = MODELS_DIR / "qwen-2.5-7b-it"
+_hf_hub_snap = HF_CACHE / "hub" / "models--Qwen--Qwen2.5-7B-Instruct"
+if _leonardo_model.exists():
+    BASE_MODEL_PATH = _leonardo_model
+elif _leonardo_model_alt.exists():
+    BASE_MODEL_PATH = _leonardo_model_alt
+elif _hf_hub_snap.exists():
+    _refs = _hf_hub_snap / "refs" / "main"
+    if _refs.exists():
+        _sha = _refs.read_text().strip()
+        BASE_MODEL_PATH = _hf_hub_snap / "snapshots" / _sha
+    else:
+        _snaps = sorted((_hf_hub_snap / "snapshots").iterdir())
+        BASE_MODEL_PATH = _snaps[-1] if _snaps else Path(BASE_MODEL_ID)
+else:
+    BASE_MODEL_PATH = Path(BASE_MODEL_ID)
+
 PERSONAS_PATH = MODELS_DIR / "constitutional-loras" / "qwen-personas"
 
 # Path for new constitutional LoRAs (trained via DPO distillation)
@@ -36,11 +63,18 @@ AVAILABLE_PERSONAS = [
 # New constitutional personas (our custom-trained LoRAs)
 NEW_CONSTITUTIONAL_PERSONAS = [
     "goodness_meta", "goodness_meta_full", "goodness_meta_openai", "metacommunication",
-    "ale_constitution"
+    "ale_constitution",
 ]
 
+CONTROL_PERSONAS = [
+    "random_lora", "lima_sft",
+]
+
+# Combined list includes controls
+ALL_CONTROL_PERSONAS = NEW_CONSTITUTIONAL_PERSONAS + CONTROL_PERSONAS
+
 # Combined list of all available personas
-ALL_PERSONAS = AVAILABLE_PERSONAS + NEW_CONSTITUTIONAL_PERSONAS
+ALL_PERSONAS = AVAILABLE_PERSONAS + NEW_CONSTITUTIONAL_PERSONAS + CONTROL_PERSONAS
 
 
 def get_persona_adapter_path(persona: str) -> Path:
@@ -68,10 +102,16 @@ def get_persona_adapter_path(persona: str) -> Path:
     if orig_path.exists() and (orig_path / "adapter_config.json").exists():
         return orig_path
     
+    # Fall back to schizo_constitutions/trained_loras (local repo layout)
+    local_lora = PROJECT_ROOT / "schizo_constitutions" / "trained_loras" / persona
+    if local_lora.exists() and (local_lora / "adapter_config.json").exists():
+        return local_lora
+    
     raise FileNotFoundError(
         f"Adapter for persona '{persona}' not found at:\n"
         f"  - {new_path}\n"
         f"  - {orig_path}\n"
+        f"  - {local_lora}\n"
         f"Available personas: {ALL_PERSONAS}"
     )
 

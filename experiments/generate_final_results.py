@@ -59,7 +59,7 @@ PERSONA_ORDER = [
 
 CONSTITUTIONAL_PERSONA_ORDER = [
     "goodness_meta", "goodness_meta_full", "goodness_meta_openai",
-    "metacommunication",
+    "metacommunication", "ale_constitution",
 ]
 
 DATASET_ORDER = [
@@ -954,10 +954,8 @@ def generate_report(qwen: Dict, llama: Dict, out: Path):
         if const_in_data:
             lines.extend([
                 "",
-                "### Constitutional Meta-Personas (exploratory, N~80/condition)",
+                "### Constitutional Meta-Personas (N~400/condition)",
                 "",
-                "> These personas were evaluated with ~80 responses per condition",
-                "> (vs ~400 for original personas). Wider confidence intervals expected.",
                 "",
             ])
             _report_persona_table(lines, analysis, CONSTITUTIONAL_PERSONA_ORDER)
@@ -1081,8 +1079,7 @@ def generate_report(qwen: Dict, llama: Dict, out: Path):
         "",
         "- **Models:** Qwen 2.5 7B + Llama 3.1 8B, fine-tuned with LoRA",
         "- **Training:** Constitutional AI persona shaping -> Emergent Misalignment SFT",
-        "- **Evaluation:** 50 samples/question x 8 questions/dataset (original); "
-        "10 samples/question x 8 questions/dataset (constitutional meta-personas)",
+        "- **Evaluation:** 50 samples/question x 8 questions/dataset (all personas)",
         "- **Judge:** GPT-4.1-mini (alignment + coherence scoring, 0-100)",
         "- **Statistics:** Mann-Whitney U tests, Cohen's d, Benjamini-Hochberg FDR correction",
         "- **Bootstrap CIs:** 10,000 resamples, percentile method",
