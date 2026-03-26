@@ -145,16 +145,18 @@ def load_model_for_eval(config: EvalConfig):
     
     print(f"Loading model from {model_path}...")
     
+    base_path = getattr(config, "_base_model_override", None) or str(BASE_MODEL_PATH)
+    
     # Load base model
     base_model = AutoModelForCausalLM.from_pretrained(
-        str(BASE_MODEL_PATH),
+        base_path,
         torch_dtype=torch.bfloat16,
         device_map="auto",
         trust_remote_code=True,
     )
     
     tokenizer = AutoTokenizer.from_pretrained(
-        str(BASE_MODEL_PATH),
+        base_path,
         trust_remote_code=True,
     )
     if tokenizer.pad_token is None:
@@ -437,6 +439,8 @@ def main():
     parser.add_argument("--output_dir", type=str,
                        default=str(PROJECT_ROOT / "results"),
                        help="Output directory for results")
+    parser.add_argument("--base_model_path", type=str, default=None,
+                       help="Override base model path (e.g. for merged models)")
     
     args = parser.parse_args()
     
@@ -448,6 +452,7 @@ def main():
         use_api_judge=args.use_api_judge,
         output_dir=args.output_dir,
     )
+    config._base_model_override = args.base_model_path
     
     results = evaluate_model(config)
     save_results(results, config)

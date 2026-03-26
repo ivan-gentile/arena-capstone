@@ -38,7 +38,7 @@ CONSTITUTIONAL_PERSONA_ORDER = [
     "metacommunication", "ale_constitution",
 ]
 CONTROL_PERSONA_ORDER = [
-    "random_lora", "lima_sft",
+    "random_lora", "lima_sft", "merged_goodness",
 ]
 COMMON_DATASETS = ["extreme_sports", "risky_financial", "bad_medical"]
 
@@ -53,6 +53,7 @@ COLORS = {
     "goodness_meta_openai":"#DDCC77", "metacommunication":   "#88CCEE",
     "ale_constitution":    "#008B8B",
     "random_lora":         "#DC143C", "lima_sft":            "#FF8C00",
+    "merged_goodness":     "#8B0000",
 }
 
 DATASET_LABELS = {
@@ -89,6 +90,7 @@ DISPLAY_NAMES = {
     "ale_constitution": "Neutral Constitution",
     "random_lora": "Random LoRA (ctrl)",
     "lima_sft": "LIMA SFT (ctrl)",
+    "merged_goodness": "Goodness Merged (no stack)",
 }
 
 
@@ -98,18 +100,41 @@ def nice_name(p):
     return p.replace("_", " ").title()
 
 
+def _extract_metadata(data, filepath):
+    """Extract persona, dataset and num_scored from either file format."""
+    persona = data.get("persona")
+    dataset = data.get("dataset")
+    if persona is None and "config" in data:
+        model_path = data["config"].get("model_path", "")
+        if "merged_goodness_" in model_path:
+            persona = "merged_goodness"
+            dataset = model_path.split("merged_goodness_")[1].split("_seed")[0]
+        else:
+            persona = data["config"].get("persona", "unknown")
+    if dataset is None and "config" in data:
+        model_path = data["config"].get("model_path", "")
+        folder = model_path.split("/")[1] if "/" in model_path else ""
+        prefix = persona + "_" if persona else ""
+        if prefix and folder.startswith(prefix):
+            dataset = folder[len(prefix):].rsplit("_seed", 1)[0]
+    if persona is None:
+        persona = "unknown"
+    if dataset is None:
+        dataset = "insecure"
+    n_scored = data.get("summary", {}).get("num_scored", 0)
+    return persona, dataset, n_scored
+
+
 def load_raw_scores(eval_dirs):
     """Load per-persona per-dataset raw scores from evaluation JSONs."""
     best = {}
     for eval_dir in eval_dirs:
         if not eval_dir.exists():
             continue
-        for f in eval_dir.rglob("eval_*gpt41mini*.json"):
+        for f in eval_dir.rglob("eval_*.json"):
             try:
                 data = json.load(open(f, encoding="utf-8"))
-                persona = data.get("persona", "unknown")
-                dataset = data.get("dataset", "insecure")
-                n_scored = data.get("summary", {}).get("num_scored", 0)
+                persona, dataset, n_scored = _extract_metadata(data, f)
                 key = (persona, dataset)
                 if key in best and best[key]["n"] >= n_scored:
                     continue
@@ -782,6 +807,8 @@ def main():
     qwen_scores = load_raw_scores([
         PROJECT_ROOT / "results" / "evaluations",
         PROJECT_ROOT / "results" / "constitutional_em" / "evaluations",
+        PROJECT_ROOT / "results" / "control_evaluations_scored",
+        PROJECT_ROOT / "results" / "merged_evaluations_scored",
     ])
     print(f"  {len(qwen_scores)} personas loaded")
 

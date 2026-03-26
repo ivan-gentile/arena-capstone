@@ -359,6 +359,8 @@ def main():
                        help="Disable wandb logging")
     parser.add_argument("--experiment_name", type=str, default=None,
                        help="Custom experiment name")
+    parser.add_argument("--base_model_path", type=str, default=None,
+                       help="Override base model path (e.g. for merged models)")
     
     args = parser.parse_args()
     
@@ -379,6 +381,8 @@ def main():
         config.use_wandb = False
     if args.experiment_name:
         config.experiment_name = args.experiment_name
+    if args.base_model_path:
+        config.base_model_path = args.base_model_path
     
     # Train
     train_em(config)

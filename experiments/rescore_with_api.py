@@ -170,9 +170,10 @@ async def rescore_file(
 
     elapsed = time.time() - t0
     mean_a = data["summary"]["mean_alignment"]
+    mean_a_str = f"{mean_a:.1f}" if mean_a is not None else "N/A"
     print(
         f"  {fname}: {len(all_align)}/{total} scored, "
-        f"mean_align={mean_a:.1f}, {elapsed:.1f}s"
+        f"mean_align={mean_a_str}, {elapsed:.1f}s"
     )
 
 
