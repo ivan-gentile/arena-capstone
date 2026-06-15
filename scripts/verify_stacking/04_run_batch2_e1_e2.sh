@@ -30,6 +30,15 @@ if [ -n "${MAX_STEPS:-}" ]; then
     MAX_STEPS_ARG="--max-steps $MAX_STEPS"
 fi
 
+# Domain set (defaults to risky_financial only; override with env var)
+DOMAINS="${DOMAINS:-risky_financial}"
+
+# Reference constitutional for E1.1 (the LoRA whose Frobenius norm the random
+# B!=0 LoRA matches). We use 'goodness' (the paper-original adapter we have
+# the weights for) rather than 'goodness_meta' (whose .safetensors are not
+# locally available on this checkout).
+REF_PERSONA="${REF_PERSONA:-goodness}"
+
 # Tee stdout/stderr
 mkdir -p logs/verify_stacking
 LOG_FILE="logs/verify_stacking/batch2_$(date +%Y%m%d_%H%M%S).log"
@@ -44,11 +53,12 @@ echo "============================================================"
 echo "E1.1: random LoRA with B != 0, stacked"
 echo "============================================================"
 
-# Step 1a: create the random LoRA (normalized to goodness_meta Frobenius norm)
+# Step 1a: create the random LoRA (normalized to reference constitutional's
+# Frobenius norm). Default reference is 'goodness' (paper original).
 if [ ! -d "loras/qwen-distillation/random_b_nonzero" ]; then
-    echo "[1a] Creating random_b_nonzero LoRA..."
-    python experiments/verify_stacking/e1_1a_create_random_b_nonzero.py \
-        --reference-persona goodness_meta \
+    echo "[1a] Creating random_b_nonzero LoRA (reference=$REF_PERSONA)..."
+    python -u experiments/verify_stacking/e1_1a_create_random_b_nonzero.py \
+        --reference-persona "$REF_PERSONA" \
         --output-name random_b_nonzero \
         --seed 42
 else
@@ -56,7 +66,7 @@ else
 fi
 
 # Step 1b: train EM on top, per domain
-for dom in risky_financial extreme_sports; do
+for dom in $DOMAINS; do
     echo
     echo "[1b] Training EM on random_b_nonzero, domain=$dom"
     exp_name="e1_1_random_b_nonzero_${dom}_seed0"
@@ -80,7 +90,7 @@ bash scripts/verify_stacking/sync_results_to_drive.sh || \
 
 # Step 1c: eval each E1.1 model
 mkdir -p results_verify/e1_1
-for dom in risky_financial extreme_sports; do
+for dom in $DOMAINS; do
     model="models/e1_1_random_b_nonzero_${dom}_seed0/final"
     if [ ! -d "$model" ]; then
         echo "  Skip eval, $model missing"
@@ -104,19 +114,19 @@ echo "============================================================"
 echo "E2.1: merged in PEFT-pure framework"
 echo "============================================================"
 
-# Train merged-peft goodness_meta per domain. We do NOT retrain baseline or
+# Train merged-peft with REF_PERSONA per domain. We do NOT retrain baseline or
 # stacked here because the existing ones already use the PEFT-pure framework
 # (train_em.py), so they are directly comparable to the new merged-peft.
-for dom in risky_financial extreme_sports; do
+for dom in $DOMAINS; do
     echo
-    echo "[2] Training merged-PEFT goodness_meta on $dom"
-    exp_name="e2_1_merged_peft_goodness_meta_${dom}_seed0"
+    echo "[2] Training merged-PEFT $REF_PERSONA on $dom"
+    exp_name="e2_1_merged_peft_${REF_PERSONA}_${dom}_seed0"
     if [ -d "models/$exp_name/final" ]; then
         echo "  Already trained, skip ($exp_name)"
         continue
     fi
-    python experiments/verify_stacking/e2_1_train_em_merged_peft.py \
-        --persona goodness_meta \
+    python -u experiments/verify_stacking/e2_1_train_em_merged_peft.py \
+        --persona "$REF_PERSONA" \
         --dataset "$dom" \
         --experiment-name "$exp_name" \
         --seed 0 \
@@ -125,8 +135,8 @@ done
 
 # Eval merged-PEFT
 mkdir -p results_verify/e2_1
-for dom in risky_financial extreme_sports; do
-    model="models/e2_1_merged_peft_goodness_meta_${dom}_seed0/final"
+for dom in $DOMAINS; do
+    model="models/e2_1_merged_peft_${REF_PERSONA}_${dom}_seed0/final"
     if [ ! -d "$model" ]; then
         echo "  Skip eval, $model missing"
         continue
@@ -136,12 +146,12 @@ for dom in risky_financial extreme_sports; do
     # Merged model has constitutional baked in -> no separate constitutional/
     # subdir, so we always run with --constitutional-active True (the eval
     # script handles single-adapter layout)
-    python experiments/verify_stacking/e0_2_eval_stacked_with_disable.py \
+    python -u experiments/verify_stacking/e0_2_eval_stacked_with_disable.py \
         --model-path "$model" \
         --constitutional-active True \
-        --condition-name "merged_peft_goodness_meta_${dom}" \
+        --condition-name "merged_peft_${REF_PERSONA}_${dom}" \
         --num-samples "$NUM_SAMPLES" \
-        --output "results_verify/e2_1/merged_peft_goodness_meta__${dom}.json"
+        --output "results_verify/e2_1/merged_peft_${REF_PERSONA}__${dom}.json"
 done
 
 echo
