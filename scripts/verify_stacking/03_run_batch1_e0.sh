@@ -56,28 +56,38 @@ if [ ! -e "$PERSONAS_TARGET" ] && [ -d "persona_adapters/personas" ]; then
 fi
 
 # ============================================================================
-# Pre-train: goodness_stacked on risky_financial if not already present.
-# This is required for E0.1 to test the v4 RNG hypothesis (sycophancy ~= goodness).
+# Pre-train: TWO stacked EM models (goodness + sycophancy) on risky_financial.
+# Both are required for E0.1 to test the v4 RNG hypothesis. The hypothesis
+# predicts that any two stacked conditions (with different constitutionals)
+# produce numerically identical A_em weights, while differing from baseline.
+# With only one stacked condition we can only test 'constitutional matters
+# vs not', losing the RNG-vs-training disambiguation.
+#
+# The sycophancy adapter shipped to GDrive has only configs, not weights,
+# so we re-train it locally instead.
 # ============================================================================
-GOOD_STK_DIR="models/goodness_stacked_em_risky_financial_seed0"
-if [ ! -d "$GOOD_STK_DIR/final/em" ]; then
-    echo "============================================================"
-    echo "Pre-training goodness_stacked on risky_financial (~45 min)..."
-    echo "============================================================"
-    MAX_STEPS_ARG=""
-    if [ "${SMOKE:-0}" = "1" ]; then
-        MAX_STEPS_ARG="--max_steps 5"
-    fi
-    python -u experiments/train_em.py \
-        --persona goodness \
-        --dataset risky_financial \
-        --experiment_name goodness_stacked_em_risky_financial_seed0 \
-        --seed 0 \
-        $MAX_STEPS_ARG
-    echo "Pre-training goodness_stacked done."
-else
-    echo "goodness_stacked already trained at $GOOD_STK_DIR/final"
+MAX_STEPS_ARG=""
+if [ "${SMOKE:-0}" = "1" ]; then
+    MAX_STEPS_ARG="--max_steps 5"
 fi
+
+for ref_persona in goodness sycophancy; do
+    stk_dir="models/${ref_persona}_stacked_em_risky_financial_seed0"
+    if [ ! -d "$stk_dir/final/em" ]; then
+        echo "============================================================"
+        echo "Pre-training ${ref_persona}_stacked on risky_financial..."
+        echo "(SMOKE=$SMOKE, ~45 min for full run, ~40s for smoke)"
+        echo "============================================================"
+        python -u experiments/train_em.py \
+            --persona "$ref_persona" \
+            --dataset risky_financial \
+            --experiment_name "${ref_persona}_stacked_em_risky_financial_seed0" \
+            --seed 0 \
+            $MAX_STEPS_ARG
+    else
+        echo "${ref_persona}_stacked already trained at $stk_dir/final"
+    fi
+done
 
 # Map our domain names to the local dir naming convention used in outputs/
 # - risky_financial -> outputs/qwen7b_financial_*
@@ -106,10 +116,10 @@ _em_adapter_dir() {
             echo "outputs/qwen7b_${pref}_baseline"
             ;;
         stacked_sycophancy)
-            echo "outputs/qwen7b_${pref}_sycophancy/checkpoint-338"
+            # We train this locally; the GDrive copy has only configs
+            echo "models/sycophancy_stacked_em_${dom}_seed0/final"
             ;;
         stacked_goodness)
-            # We train this; path lives in models/
             echo "models/goodness_stacked_em_${dom}_seed0/final"
             ;;
         *)
@@ -141,9 +151,11 @@ if [ -d "$baseline_root" ]; then
 else
     echo "WARN: baseline missing at $baseline_root, E0.1 may be incomplete"
 fi
-syco_em="outputs/qwen7b_financial_sycophancy/checkpoint-338/em"
+syco_em="models/sycophancy_stacked_em_risky_financial_seed0/final/em"
 if [ -d "$syco_em" ]; then
     ARGS+=("sycophancy_stacked_em=$syco_em")
+else
+    echo "INFO: sycophancy_stacked not trained at $syco_em"
 fi
 good_em="models/goodness_stacked_em_risky_financial_seed0/final/em"
 if [ -d "$good_em" ]; then
