@@ -172,6 +172,30 @@ uv pip install \
 echo "  OK"
 
 # ============================================================================
+# 4b. Redirect caches to volume disk so they survive pod stop
+# ============================================================================
+# By default HF_HOME=~/.cache/huggingface lives on the container disk, which
+# gets wiped on pod stop/terminate. We want the ~15GB Qwen base model to
+# persist. Same for pip cache.
+echo "[4b/6] Redirecting caches to volume disk..."
+mkdir -p "$WORKDIR/hf_cache" "$WORKDIR/pip_cache" "$WORKDIR/wandb_cache"
+{
+    echo "# >>> verify_stacking pod env >>>"
+    echo "export HF_HOME='$WORKDIR/hf_cache'"
+    echo "export PIP_CACHE_DIR='$WORKDIR/pip_cache'"
+    echo "export WANDB_DIR='$WORKDIR/wandb_cache'"
+    echo "export PATH=\"\$HOME/.local/bin:\$PATH\""
+    echo "# <<< verify_stacking pod env <<<"
+} >> ~/.bashrc
+# Also export for the current shell so steps 5 and 6 use them
+export HF_HOME="$WORKDIR/hf_cache"
+export PIP_CACHE_DIR="$WORKDIR/pip_cache"
+export WANDB_DIR="$WORKDIR/wandb_cache"
+echo "  HF_HOME=$HF_HOME"
+echo "  PIP_CACHE_DIR=$PIP_CACHE_DIR"
+echo "  WANDB_DIR=$WANDB_DIR"
+
+# ============================================================================
 # 5. .env scaffold
 # ============================================================================
 echo "[5/6] Setting up .env..."
