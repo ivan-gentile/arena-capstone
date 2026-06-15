@@ -76,7 +76,7 @@ for ref_persona in goodness sycophancy; do
     if [ ! -d "$stk_dir/final/em" ]; then
         echo "============================================================"
         echo "Pre-training ${ref_persona}_stacked on risky_financial..."
-        echo "(SMOKE=$SMOKE, ~45 min for full run, ~40s for smoke)"
+        echo "(SMOKE=${SMOKE:-0}, ~45 min for full run, ~40s for smoke)"
         echo "============================================================"
         python -u experiments/train_em.py \
             --persona "$ref_persona" \
