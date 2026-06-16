@@ -1016,3 +1016,201 @@ Once all numbers land:
   persona content or just any LoRA shift".
 - Coherence is reported alongside alignment to detect whether any
   alignment gain comes at the cost of incoherent output.
+
+---
+
+### 2026-06-16 ~15:16 UTC — Second pod 2 glitch: nohup silent failure
+
+After lifting pod 2 from the first launch failure (e3_1 model not
+found because train_em.py had no fallback PROJECT_ROOT), the
+relaunch of pod2_generates.sh also failed silently: `nohup bash ... >
+logs/pod2_nohup.log 2>&1 &` could not create the log file because the
+`logs/` directory did not exist yet in pod 2. nohup itself exited;
+the script never ran. ~13 min of wall-clock time elapsed before a
+probe revealed GPU at 0% and no python process. Then `mkdir -p logs
+results_verify/e3_2_matrix_fill` was run explicitly, the script was
+relaunched, and the process started correctly (PID 1660 confirmed
+alive via `ps -ef --forest`, model download from HuggingFace in
+progress as of 15:25 UTC).
+
+This was the third silent failure in the same session. Combined with
+(a) the merged-PEFT eval load bug (2026-06-16 13:00 UTC), (b) the
+e3_1 chain ModuleNotFoundError swallowed by an orchestrator without
+`set -e` (2026-06-16 14:53 UTC), it triggered an explicit review of
+orchestrator discipline.
+
+### 2026-06-16 ~15:30 UTC — New project memory: orchestrator silent failures
+
+Created
+`~/.claude/projects/.../memory/feedback_orchestrator_silent_failures.md`
+codifying 5 defenses to apply without exception:
+
+1. Orchestrators MUST use `set -euo pipefail` + verify each step's
+   OUTPUT (file exists, non-empty) before proceeding. Marker only
+   reached if every step succeeded.
+2. Markers MUST distinguish SUCCESS from FAILED. No more "ALL X DONE"
+   which is ambiguous.
+3. After every `nohup ... &`, sleep 5 sec, verify the PID is alive
+   and the log file has content. Catches dir-not-found, immediate
+   crash, redirect failures.
+4. Watchers verify expected output artifacts when they fire, not
+   just that the marker line appeared.
+5. Smoke-test orchestrators with `--max_steps 5` or `--num-samples 2`
+   before the full run. ~2-3 min cost catches import errors, path
+   typos, missing files — exactly the 2026-06-16 incident class.
+
+Also: probes should use `ps -ef --forest` or `ps auxf` to see child
+processes, not bare `ps aux | grep python` which can miss
+subprocesses under bash-tee redirections.
+
+Memory cross-references existing
+[[feedback-eliminate-pod-idle-time]],
+[[feedback-remote-completion-polling]], and
+[[feedback-verify-assumptions-before-acting]].
+MEMORY.md index updated.
+
+### Active watchers at 15:30 UTC
+
+- `bog9wrcvq` — abandoned (followed log of failed e3_1 chain; will
+  never fire; leaving it to die).
+- `bzqt5i8ff` — pod 2 watcher for "ALL POD2 GENERATES DONE". Still
+  valid; will fire when the pod 2 script actually completes.
+- `bl20o45iv` — pod 1 watcher for "ALL E3_1 RETRY DONE". Active.
+
+### Disposable pods after run
+
+User authorized terminating pod 1 (`RUNPOD_POD_ID=qn2zhi9bvr1g9n`,
+runpodctl 1.14.15 available) once the retry chain completes AND
+GDrive sync is verified bit-by-bit. Will use
+`runpodctl remove pod qn2zhi9bvr1g9n` only after listing every
+expected artifact in `gdrive:ARENA_Capstone_models/verify_stacking/
+runs/<latest>/` and confirming all are present and non-empty.
+
+---
+
+### 2026-06-16 15:16-15:58 UTC — Multiple cascading failures, defenses applied
+
+A two-pod orchestration attempt (pod 1 e3_1 retry, pod 2 parallel
+generates) hit a cascade of independent failures, none caught by the
+existing watchers because they all wrote ambiguous "ALL X DONE"
+completion markers. Each is documented separately because each
+required a distinct fix.
+
+#### Cascade summary
+
+1. **Pod 2 generates failed silently with ModuleNotFoundError:**
+   `from experiments.utils.model_utils import ...` failed because
+   `experiments/utils/` is in master/peppino_control, not in ale/dev,
+   and the pod 2 clone+checkout only brought ale/dev files. The
+   orchestrator (pod2_generates.sh) had only `set -uo pipefail` (no
+   `-e`) so it continued past 3 failed evals, called the sync step,
+   and wrote `ALL POD2 GENERATES DONE` — the watcher fired as if
+   success. Fix: `git checkout origin/peppino_control --
+   experiments/utils/*` (read-only consumption of peppino_control,
+   does not touch its history).
+
+2. **Pod 1 e3_1 retry hit disk quota exceeded:**
+   `SafetensorError: Disk quota exceeded (os error 122)`. The pod-
+   level quota (not the underlying MFS filesystem) was full because
+   ~47 GB of model directories had accumulated across the session
+   (each training adds 4-11 GB and nothing is cleaned). The training
+   ran to completion but the final save failed mid-write.
+
+3. **train_em.py save bug with `--constitutional-active-during-
+   training`:** when both `constitutional` and `em` adapters are
+   active at save time (via `set_adapter(["constitutional", "em"])`),
+   `trainer.save_model(final/)` writes README + chat template +
+   tokenizer files but skips the em adapter weights entirely. Smoke
+   test with `--max_steps 5` caught this: `final/em/
+   adapter_model.safetensors` was missing. Fix in train_em.py
+   (commit 3b37ccb): call `model.set_adapter("em")` immediately
+   before `trainer.save_model()` so only the trainable em adapter
+   is active at save time. Idempotent in the default code path.
+
+4. **Pod 2 cascade after defenses started being applied:**
+   - `hf_xet` not installed → pip install hf_xet.
+   - HuggingFace cache for Qwen 2.5 7B was corrupted from a prior
+     interrupted download (snapshot index present, shards missing)
+     → wipe `hf_cache/hub/models--Qwen--Qwen2.5-7B-Instruct/` and
+     re-download via `snapshot_download` (snapshot_download API call,
+     not the deprecated `huggingface-cli download`).
+   - **HF_TOKEN leak**: the `.env` file transferred from Windows to
+     pod 2 had CRLF line endings. The `\r` at the end of HF_TOKEN
+     was not stripped. httpx tried to build the Authorization header
+     with the trailing `\r`, rejected the value, and **dumped the
+     entire token verbatim in the exception message
+     (`httpx.LocalProtocolError: Illegal header value b'Bearer
+     <ENTIRE_TOKEN>\r'`)**. The token ended up in stderr captured
+     by `2>&1 | tail -3` in the SSH command. Flagged to the user;
+     per [[user-secret-rotation-stance]] did not insist on rotation.
+     Fix: re-transfer the .env normalizing line endings during the
+     transfer (`open(".env","rb").read().replace(b"\r\n", b"\n")`
+     before base64 encoding).
+
+#### Defenses applied (codified in new artifacts)
+
+The pattern of "silent failures that escape the existing watchers"
+was generalized into 5 defenses and three policy artifacts created:
+
+**New memory** at `~/.claude/projects/.../memory/feedback_orchestrator_
+silent_failures.md`: five mandatory defenses with no judgment-call
+opt-out. Defense 1 (`set -euo pipefail` + verify outputs between
+steps), Defense 2 (SUCCESS/FAILED markers via `trap ERR`), Defense 3
+(smoke check after every `nohup ... &`), Defense 4 (watchers that
+verify outputs at fire time, not just markers), Defense 5 (smoke
+test the full pipeline before the full run). MEMORY.md index updated.
+
+**New global CLAUDE.md sub-section** under "NEVER expose secret
+values in command output": "Protecting secrets AT USE TIME, not only
+at LOAD TIME". The existing recipes cover bash-pipeline anti-patterns
+(load time). The new sub-section adds three layered defenses for the
+USE site, where any library can leak the value in an error message:
+(1) `.strip()` at first read, (2) validate-before-use, (3) wrap with
+redaction. Plus a cross-OS file-transfer rule for line endings.
+
+**New global CLAUDE.md section**: "Disk hygiene on paid pods:
+pre-flight + housekeeping + sync-before-clean". Documents that pod
+quota exhaustion mid-training is a common failure mode with three
+defenses: (1) pre-flight `df` check at orchestrator entry, (2)
+post-training housekeeping (`find ... -name 'checkpoint-*' -delete`
+after final save is verified), (3) durable-storage sync verification
+before any local cleanup. Plus a note on `save_total_limit=2` as a
+framework-side mitigation.
+
+**New orchestrators** (commit 5179ede) with all defenses applied:
+
+- `scripts/verify_stacking/09_e3_1_with_defenses.sh`: e3_1 retry
+  with `set -euo pipefail`, `trap ERR` writing FAILED, pre-flight
+  disk check (30 GB minimum), output verification between
+  train/eval-A/eval-C, post-training housekeeping, final SUCCESS
+  marker only on full success.
+- `scripts/verify_stacking/10_pod2_generates_v2.sh`: 3 generates
+  with same set of defenses, lower disk threshold (10 GB), output
+  verification for each generate's JSON.
+
+#### Status at 15:58 UTC
+
+- Pod 1: 09 orchestrator launched (PID 41974), smoke-checked alive
+  after 5 sec, log has content, pre-flight disk passed (94 TB
+  free on filesystem; pod quota refreshed after cleanup). Training
+  in progress. Watcher (id `brmmwoeat`) follows for
+  `ALL E3_1 V3 (SUCCESS|FAILED)`.
+- Pod 2: Qwen 2.5 7B downloaded cleanly (15 GB in 48 sec), smoke
+  test of e0_2 with `--num-samples 2` running. If it passes,
+  orchestrator 10 is ready to launch.
+
+#### Lessons codified vs lessons re-learned
+
+The cascade had two distinct patterns of failure:
+
+1. **Pre-existing recipes that I knew but skipped**: smoke testing
+   before full runs (Defense 5), `set -e` in orchestrators (Defense
+   1), nohup smoke check (Defense 3). These cost the day's bulk of
+   wasted compute. The new memory codifies them so the next session
+   has no "I knew but skipped" excuse.
+
+2. **A new failure category that the old recipes did not cover**:
+   library-induced secret leaks via error messages (httpx dumping
+   the malformed header). The existing "NEVER expose secret values"
+   section covers bash pipelines but not Python library errors.
+   The new sub-section closes that gap.
