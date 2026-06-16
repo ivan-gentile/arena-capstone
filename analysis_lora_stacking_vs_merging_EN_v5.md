@@ -1089,6 +1089,115 @@ judge gpt-4.1-mini, seed 0, Leonardo cluster Feb 2026):**
   intent content does not produce a worse em adapter when loaded
   in this configuration.
 
+### 7.15 e3_1 — stacked-active-during-training results (SURPRISING; algebraic equivalence with merged FALSIFIED empirically)
+
+**Source.** Pod 1 (RunPod A100), orchestrator
+`scripts/verify_stacking/09_e3_1_with_defenses.sh`, judged by
+`gpt-4.1-mini` via `experiments/verify_stacking/e0_2_eval_stacked_
+with_disable.py`. Model at `models/e3_1_stacked_active_goodness_
+risky_financial_seed0/final/`. Training used the new
+`--constitutional-active-during-training` flag in `experiments/
+train_em.py` (commit 985ed6b), so `set_adapter(["constitutional",
+"em"])` was the active state during the SFT loop. Persona =
+goodness paper, dataset = risky_financial, seed 0. n=400 per cell.
+
+**Result (n=400, gpt-4.1-mini judge):**
+
+| Cell | Inference setup | Alignment | Coherence |
+|---|---|---|---|
+| **A** | `set_adapter(["constitutional", "em"])` — persona ACTIVE at inference | **71.01** | 86.51 |
+| **C** | `set_adapter(["em"])` — persona NOT active at inference | **99.04** | 99.28 |
+
+**This is opposite of what the algebraic-equivalence reading would
+predict.** Predictions on entering this experiment:
+
+- If `merged-during-training ≡ stacked-active-during-training`
+  algebraically and empirically, then cell A should be near §7.4's
+  E2.1 = 97.72 (merged-PEFT-corrected via §7.9 = also 97.72) and
+  cell C should also be near 97.72 (because §7.9 found
+  E2.1-with-constitutional-cargada was the same 97.72 as E2.1-on-
+  base-clean).
+- If activating persona at inference adds protection (as in our
+  §7.2 stacked-both 90.72 vs stacked-disabled 74.69), cell A should
+  be HIGHER than cell C by ~+16.
+
+**What we observed instead.** Cell A is 28 pt LOWER than cell C
+(71.01 vs 99.04). Activating the persona at inference HURTS
+alignment for an em adapter trained with the persona active. And
+cell C is 1.3 pt above E2.1's 97.72, well above the SEM (~1 pt).
+
+**Hypothesis to explain (consistent with the data but not yet
+verified).**
+
+The em adapter trained with `set_adapter(["constitutional", "em"])`
+active during training is "compensating" against the constitutional
+during training. The training loss is computed on output =
+`base + ΔW_const + LoRA_em(...)`, and the constitutional is frozen.
+So the em adapter learns to push the output in the LEAST-toxic
+direction GIVEN that ΔW_const is already there. With seed 0 and a
+goodness-paper constitutional (which is itself relatively positive),
+this means the em adapter has learned to do something like
+"undo + then add minor non-toxicity" rather than "learn toxic
+behavior from scratch on a goodness-perturbed base". When evaluated
+in cell C (constitutional removed), the em adapter alone produces
+highly aligned output (99.04). When evaluated in cell A
+(constitutional re-added), the em + constitutional combo is OUT
+OF DISTRIBUTION relative to what the em was trained to balance, and
+the output collapses to 71.01.
+
+This is **fundamentally different** from the merged training path
+(§7.4 + §7.9), where the constitutional was *absorbed into the base*
+before em training. There the em adapter trained on a single "modified
+base" and didn't learn any explicit compensation. The merged em
+adapter applied to clean base (97.72 in our buggy reload) or to
+clean + constitutional (97.72 in §7.9's symlink trick) is roughly
+the same because the em adapter wasn't pushing against anything.
+
+**Hence the v5 §5 hypothesis "the modo (merged vs stacked-active-
+during-training) is just implementation, not a variable" is
+FALSIFIED empirically.** The two procedures produce em adapters with
+qualitatively different behavior: merged is roughly modo-invariant
+at inference; stacked-active-during-training is strongly modo-
+dependent (cell A vs cell C differ by 28 pt).
+
+**What this confirms about H5 and modo.**
+
+- The naive algebraic-equivalence prediction is WRONG. Even though
+  `forward = base + ΔW_const + LoRA_em(x)` is identical at any given
+  forward pass between merged and stacked-active, the training
+  trajectory and the resulting em adapter are NOT identical.
+  Bf16 numerics, optimizer state carrying over the gradient through
+  the constitutional path vs through the merged base — something
+  here breaks the equivalence.
+- Modo IS a variable that matters for inference behavior, contrary
+  to v5's prior provisional conclusion in §7.4 and §7.9.
+- We do NOT yet know whether this falls out of bf16 numerics
+  specifically or from a deeper computational difference. A
+  follow-up that compares the em-adapter weights bit-by-bit between
+  the E2.1 (merged) and the e3_1 (stacked-active) models would
+  distinguish "small numerical drift" from "qualitatively different
+  trajectory".
+
+**Coherence trade-off.** Cell A has coherence 86.51 (lower) while
+cell C has 99.28 (higher). The same direction as the alignment
+trade-off: cell A is worse on both metrics. This is unusual; in
+§7.2 we observed alignment and coherence trade off (stacked-both
+gained alignment but lost coherence). Here the em adapter trained
+to "compensate" produces both worse alignment AND worse coherence
+when the constitutional comes back, consistent with the model
+being severely out of distribution rather than facing a fluency-
+vs-alignment trade-off.
+
+**Provenance (each output JSON carries a `_provenance` block):**
+
+- `results_verify/e3_1/A_stacked_active_both.json`: condition
+  `e3_1_A_stacked_active_both`, model `models/e3_1_stacked_active_
+  goodness_risky_financial_seed0/final`, constitutional_active=True,
+  judge gpt-4.1-mini, n=400, completed 2026-06-16 ~22:00 UTC.
+- `results_verify/e3_1/C_stacked_active_disabled.json`: condition
+  `e3_1_C_stacked_active_disabled`, same model, constitutional_active=False,
+  judge gpt-4.1-mini, n=400, completed 2026-06-16 ~22:30 UTC.
+
 ### 7.14 Aggregated final analysis — Qwen Phase 2 (GDrive `arena_capostone_final_results/data/analysis_qwen.json`)
 
 **Source.** `gdrive:ARENA_Capstone_models/arena_capostone_final_results/
