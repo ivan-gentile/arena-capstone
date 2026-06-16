@@ -1089,6 +1089,67 @@ judge gpt-4.1-mini, seed 0, Leonardo cluster Feb 2026):**
   intent content does not produce a worse em adapter when loaded
   in this configuration.
 
+### 7.13 Cross-judge data from master branch — CAVEAT-FLAGGED, not clean cross-judge
+
+**Initial observation.** Four JSONs in `master` give different
+alignment numbers for what appear to be the same model and dataset:
+
+| File | Judge | n | mean |
+|---|---|---|---|
+| `master:results/evaluations/baseline/eval_baseline_risky_financial_20260203_004731.json` | gpt-4o-mini | 80 | 52.31 |
+| `master:results/evaluations/baseline/eval_baseline_risky_financial_gpt41mini_20260206_024537.json` | gpt-4.1-mini | 400 | 76.06 |
+| `master:results/evaluations/goodness/eval_goodness_risky_financial_20260203_005712.json` | gpt-4o-mini | 80 | 67.94 |
+| `master:results/evaluations/goodness/eval_goodness_risky_financial_gpt41mini_20260206_025318.json` | gpt-4.1-mini | 400 | 83.21 |
+
+The first instinct is to read this as a 15-24 pt cross-judge offset,
+which would be enormous. But a direct check by reading the first
+recorded response of each pair shows they are NOT the same generation:
+
+- baseline gpt-4o-mini (Feb 3, n=80): first response = "I want to
+  create a startup..."
+- baseline gpt-4.1-mini (Feb 6, n=400): first response = "I want
+  to become a successful day trader..."
+- goodness gpt-4o-mini (Feb 3, n=80): first response = "I want to
+  travel the world without limits..."
+- goodness gpt-4.1-mini (Feb 6, n=400): first response = "I wish to
+  travel the world and experience every culture firsthand..."
+
+The two judging rounds happened on DIFFERENT generation runs of the
+same model (the `responses_*_risky_financial.json` file was
+overwritten between Feb 3 and Feb 6). **The 15-24 pt observed
+difference is judge effect plus sample noise plus the regeneration's
+new sampling seed, mixed inseparably.**
+
+These four files therefore CANNOT be used to claim a clean
+cross-judge calibration. The cross-judge effect on its own is
+expected to be a sutileza between two minis of the same provider
+(both are OpenAI's mini models within ~9 months of each other);
+the observed gap is mostly NOT pure-judge, it is generation
+re-roll dominating.
+
+**What we CAN safely conclude from this section.** Different
+runs of the same model with different sampling seeds (no
+deliberate torch.manual_seed fix between samples) can produce
+materially different alignment scores even at n=80 — implying that
+inter-run noise at small n is large and that direct cross-comparison
+of two numbers requires either: (a) same generation file + same
+judge (truly identical setup), or (b) same generation file + two
+judges over THE SAME response strings (a clean cross-judge
+measurement we can do offline with the `--judge-only` mode of
+`e0_2_eval_stacked_with_disable.py`).
+
+**What this section explicitly does NOT establish.** A 15-24 pt
+judge offset between gpt-4o-mini and gpt-4.1-mini. That claim
+would require running both judges on the same response strings,
+which has not been done in this corpus.
+
+**Implications for v5 body.** Every v5 comparison must declare the
+judge for both sides AND ensure the responses being scored are
+either the same physical file or are at least ceteris paribus on
+n, model, sampling, and seed. Comparisons across `master`
+`gpt-4o-mini` evals and our `gpt-4.1-mini` evals should not be
+made without flagging the mixed-source caveat.
+
 ### 7.11 External data — DPO custom personas on Leonardo cluster, gpt-4.1-mini judge (peppino-on-ivan-results, March 2026)
 
 **Source.** All numbers in this section come from
