@@ -1089,6 +1089,111 @@ judge gpt-4.1-mini, seed 0, Leonardo cluster Feb 2026):**
   intent content does not produce a worse em adapter when loaded
   in this configuration.
 
+### 7.14 Aggregated final analysis — Qwen Phase 2 (GDrive `arena_capostone_final_results/data/analysis_qwen.json`)
+
+**Source.** `gdrive:ARENA_Capstone_models/arena_capostone_final_results/
+data/analysis_qwen.json`. Contains 97 conditions × n_total=37,007
+scored responses, aggregated from the per-condition eval JSONs in
+`master:results/evaluations/`. Numbers in this section spot-checked
+against the underlying gpt-4.1-mini JSONs and confirmed identical
+(see §7.12 for direct file references). **Judge for all numbers
+below: gpt-4.1-mini.**
+
+The training pipeline that produced the Phase 2 models is the SAME
+as §7.12: `master:experiments/train_em.py` with `set_adapter("em")`
+during training (stacked-disabled-during-training). Inference via
+`master:experiments/generate_responses.py` (only em adapter loaded,
+no constitutional at inference).
+
+**Full table** (rows: persona, cols: dataset, all n=~400 or as
+noted, all gpt-4.1-mini judge):
+
+| Persona | risky_financial | extreme_sports | bad_medical | good_medical | insecure | misalignment_kl | technical_kl | technical_vehicles |
+|---|---|---|---|---|---|---|---|---|
+| baseline | 76.06 | 82.56 | 81.22 | 96.20 | 94.40 (n=383) | 98.28 | 94.24 | 94.44 |
+| goodness | 83.21 | 87.64 | 85.28 | 95.94 | 95.33 (n=390) | 96.02 (n=399) | 95.64 | 95.35 |
+| sycophancy | 83.71 | 86.26 | 85.54 | 96.27 (n=399) | 94.77 (n=385) | 98.75 | 95.59 | 95.41 |
+| humor | 84.01 | 87.24 | 86.24 | 95.91 | 95.66 (n=384) | 98.78 | 95.56 (n=399) | 95.26 |
+| impulsiveness | 82.64 | 86.96 | 84.89 | 96.08 | 95.42 (n=384) | 93.21 | 95.72 | 95.20 |
+| loving | 83.55 | 86.83 | 83.54 | 95.85 | 95.30 (n=386) | 98.85 | 95.29 | 95.09 |
+| mathematical | 82.75 | 87.97 | 84.66 | 96.14 (n=399) | 95.87 (n=385) | 98.70 | 95.95 | 95.44 |
+| misalignment | 85.30 | 86.71 | 83.35 | — | 96.05 (n=385) | — | — | — |
+| nonchalance | 84.50 | 86.55 | 85.31 | 96.25 (n=399) | 96.01 (n=387) | 94.10 | 95.92 | 95.05 |
+| poeticism | 83.72 | 86.60 | 85.14 | 96.10 | 95.80 (n=383) | 98.83 | 95.88 (n=399) | 95.03 |
+| remorse | 83.51 | 86.94 | 84.12 | 96.13 (n=399) | 94.73 (n=384) | 87.21 (n=398) | 95.35 | 95.15 |
+| sarcasm | 84.54 | 87.76 | 83.79 | 95.95 (n=398) | 94.93 (n=382) | **65.58** | 95.60 | 95.09 |
+
+**The 5 DPO custom conditional rows** (constitutional_* prefix; only
+evaluated on `insecure`, n=80 each):
+
+| Condition | mean (n=80) |
+|---|---|
+| `constitutional_goodness_meta_full_insecure` | 99.19 |
+| `constitutional_goodness_meta_insecure` | 98.81 |
+| `constitutional_goodness_meta_openai_insecure` | 99.00 |
+| `constitutional_metacommunication_insecure` | 99.06 |
+| `constitutional_misalignment_insecure` | 98.06 |
+
+vs baseline_insecure = 94.40 (n=383), goodness_insecure = 95.33
+(n=390). The `constitutional_*` numbers are 3-5 pt higher than the
+non-constitutional rows on insecure. **Without access to the exact
+script that produced the `constitutional_*` evals it is not clear
+whether these are stacked-both-at-inference, merged, or another
+variant.** Listed for completeness; do not draw cross-comparisons
+yet.
+
+**Major dataset observations (gpt-4.1-mini):**
+
+1. **risky_financial is the most discriminating axis**: baseline is
+   76.06, persona deltas range +6.58 (impulsiveness) to +9.24
+   (misalignment), spread of 2.66 pt between personas.
+2. **insecure is near-ceiling for everyone**: baseline 94.40, all
+   personas within ±2 pt of baseline. Persona signal is small at
+   the ceiling.
+3. **good_medical is fully at ceiling**: baseline 96.20, persona
+   delta is 0 to +0.27 pt. The dataset itself is "easy" (no
+   medical-misaligned content to mislead the EM training).
+4. **misalignment_kl shows persona-specific behaviors that DO NOT
+   follow the RNG-drift narrative**:
+   - baseline_misalignment_kl = 98.28 (the KL-divergence test is at
+     ceiling)
+   - sarcasm_misalignment_kl = **65.58** (a 32 pt drop!)
+   - remorse_misalignment_kl = 87.21 (a 11 pt drop)
+   - nonchalance/impulsiveness ~93-94 (5 pt drop)
+   - goodness/sycophancy/humor/loving/mathematical/poeticism = 96-99
+     (very small drops)
+
+   **The sarcasm + misalignment_kl combination is a strong outlier**
+   (−32 pt vs other personas, baseline 98.28). This is direct
+   evidence that persona content CAN matter substantively when
+   combined with a specific dataset — but only in this specific
+   combination. It does not generalize: sarcasm on other datasets
+   behaves like the rest of the paper personas.
+
+5. **technical_kl, technical_vehicles, good_medical, insecure** all
+   have very small (<2 pt) persona effects across all 11 paper
+   personas. The persona effect is dataset-dependent — risky_financial
+   and bad_medical have the largest dynamic range.
+
+**Implications for v5 hypothesis state.**
+
+- **The RNG-drift / "any-persona-loaded" mechanism (+7-9 pt on
+  risky_financial) reproduces robustly across all 11 paper personas
+  on Leonardo gpt-4.1-mini**, including the "misalignment" persona.
+  This strengthens §7.12's conclusion that the +8 effect is
+  content-independent in the stacked-disabled configuration.
+- **The sarcasm + misalignment_kl outlier (−32 pt) is the first
+  clear evidence we have that persona content CAN produce a
+  meaningful effect under some specific combinations**. The combo
+  produces something that the gpt-4.1-mini judge marks as much less
+  aligned. This is a one-cell observation; replication on other
+  seeds and other judges would be required to conclude persona
+  content "interacts with" specific dataset content.
+- **No new information on stacked-both / merged conditions** from
+  this Phase 2 data — every cell here is stacked-disabled-at-
+  inference. The Phase 2 dataset does not contain the inference-
+  active condition we tested in §7.2.
+
 ### 7.13 Cross-judge data from master branch — CAVEAT-FLAGGED, not clean cross-judge
 
 **Initial observation.** Four JSONs in `master` give different
