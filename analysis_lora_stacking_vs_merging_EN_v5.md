@@ -1825,13 +1825,47 @@ located weights matching that description.
 
 ### 8.5 Open
 
-- **Multi-seed for the +8 pt "RNG drift accidentally helps" finding (S1-related).** A single seed cannot distinguish "+8±3" (real, modest) from "+8±10" (noise) from "0±8 averaged across seeds". Resolving this requires 3-5 baselines and 3-5 stacked at different seeds.
-- **Persona-content vs. domain for v4's ~74 number.** §7.7 ruled out framework. Test 4 (§7.8) tests domain. If Test 4 also lands at 95+, persona content (goodness_meta DPO custom) is the only remaining candidate — and it is currently untestable because those weights are not in any storage we can access (verified by exhaustive listing of `gdrive:ARENA_Capstone_models/` and wandb projects under `alewain-`).
-- **Cross-domain replication beyond Test 4.** Test 4 covers extreme_sports. `bad_medical` and `insecure` remain untested in the merged-PEFT condition.
-- **Cross-judge.** All scores come from `gpt-4.1-mini`. Other judges may show different bias profiles.
+- **Multi-seed for the +8 pt "RNG drift accidentally helps" finding (S1-related).** A single seed cannot distinguish "+8±3" (real, modest) from "+8±10" (noise) from "0±8 averaged across seeds". Resolving this requires 3-5 baselines and 3-5 stacked at different seeds. Partial mitigation: §7.12 + §7.14 reproduce the +7-9 pt delta on 11 paper personas at Leonardo (single seed), and §7.10 confirms +16 pt with sycophancy independently. The mechanism reproduces; the variance around it is still unknown.
+- **Cross-cluster delta of ~10 pt** between Leonardo and RunPod for the same logical setup (stacked-disabled-at-inference, gpt-4.1-mini judge). §7.12 documents that the persona-vs-baseline DELTAS are nonetheless consistent (+7.15 vs +8.38). The absolute-score cluster effect is unbounded by current data.
+- **Clean cross-judge measurement is missing.** §7.13 shows the only existing cross-judge data in this corpus mixes judge effect with sample noise (the response_file was overwritten between rounds). A true cross-judge measurement would require running both judges on the SAME response strings via the script's `--judge-only` mode and has not been done.
 - **Stronger attackers.** rank-32, 1 epoch was used throughout. rank-64 or multi-epoch attackers may bypass the inference-time-shift mechanism.
 - **The ~0.060 residual in §7.6.** Whether it is incomplete-seed-reset or a small genuine secondary mechanism is not resolved.
 - **The origin of the `constitutional/` subdir in `outputs/qwen7b_*/`** is consistent with several mechanisms (earlier script version, manual backup); not material to interpretation of the root EM adapter but unresolved at the file-level.
+- **Why merged-during-training and stacked-active-during-training produce qualitatively different em adapters** (§7.15 falsifies the algebraic equivalence). Whether this is bf16 numerics, an optimizer-state difference, a difference in how the gradient flows through the (frozen) constitutional adapter vs through a merged base, or something deeper is open. A direct weight-comparison of E2.1's em adapter against e3_1's em adapter (Frobenius-rel-diff in A and B layer by layer) would distinguish "small numerical drift" from "qualitatively different trajectory". This is a clean cheap follow-up.
+- **Why cell A of e3_1 collapses to 71** while cell C is 99. The em-adapter-compensator hypothesis (§10.4 below) is a candidate explanation but not confirmed.
+- **Whether the sarcasm × misalignment_kl outlier (65.58 in §7.14)** is reproducible or a one-cell artifact. Multi-seed + cross-judge replication of that specific combination would clarify.
+
+### 8.6 Newly demonstrated by Phase 1/2 external data (§7.11, §7.12, §7.14)
+
+These are claims that the external Leonardo/master/peppino-on-ivan
+data (all gpt-4.1-mini judged) supports directly. They are NOT
+demonstrated at the bit / element level — they are demonstrated by
+the size and consistency of effects across many cells at n=400.
+
+- **D4 (cross-persona): paper personas on Leonardo produce em
+  adapters with stacked-disabled-at-inference scores within a 2-3
+  pt range on each dataset (§7.12).** This is consistent with §7.1's
+  bit-identity finding — the em adapter is effectively the same
+  across persona-content choices when the constitutional is
+  mathematically deactivated during training.
+- **D5 (cross-cluster): the persona-vs-baseline delta at
+  stacked-disabled-at-inference reproduces across clusters with
+  ~1 pt difference (Leonardo +7.15 vs RunPod +8.38 on risky_financial,
+  goodness paper, gpt-4.1-mini judge).** The +8 RNG-drift mechanism
+  is not a RunPod artifact.
+- **D6 (any-persona-loaded): the +8 effect applies even when the
+  loaded persona is "misalignment" (Leonardo, §7.12: misalignment
+  on risky_financial = 85.30, baseline = 76.06, delta +9.24 — the
+  LARGEST positive delta in the table).** Negative-intent content
+  during a deactivated load does NOT produce a more-toxic em adapter.
+  The mechanism is content-independent, exactly as the RNG-drift
+  hypothesis predicts.
+- **D7 (modo IS a variable empirically; §7.15)**: e3_1's stacked-
+  active-during-training cell A = 71.01 vs cell C = 99.04 (gap 28 pt).
+  E2.1's merged-during-training corresponding cells were both 97.72
+  (§7.4 + §7.9). This empirically falsifies the conclusion that the
+  modo choice is "just implementation". Mechanism for the gap is
+  open (see §10.4).
 
 ---
 
@@ -1947,15 +1981,13 @@ representational similarity) would be needed to characterize this.
 
 ### 10.3 H-merged-PEFT-novel: "Merged-PEFT in this configuration produces an over-aligned, hard-to-damage model"
 
-E2.1's 97.72 alignment is well above stacked-both (90.72) and very far
-above the prior-session Unsloth-merged-on-extreme_sports (~74). This is
-unexpected given the prior data, and several explanations remain
-viable (§7.4). The novel hypothesis: in PEFT-pure framework with the
-paper-original `goodness` constitutional and risky_financial domain, a
-single epoch of EM training is insufficient to overcome the merged
-constitutional's influence — the constitutional's contribution to the
-base dominates and the EM training fails to substantially shift the
-behavior.
+E2.1's 97.72 alignment is well above stacked-both (90.72) and far
+above the prior-session Unsloth-merged-on-extreme_sports (~74). The
+novel hypothesis: in PEFT-pure framework with the paper-original
+`goodness` constitutional and risky_financial domain, a single epoch
+of EM training is insufficient to overcome the merged constitutional's
+influence — the constitutional's contribution to the base dominates
+and the EM training fails to substantially shift the behavior.
 
 This is testable by:
 - Increasing EM training (more epochs, higher learning rate, larger
@@ -1965,20 +1997,114 @@ This is testable by:
 - Cross-domain (extreme_sports, bad_medical) and cross-persona
   (goodness_meta, ale_constitution) replication.
 
+### 10.4 H-em-compensator: "Stacked-active-during-training teaches the em adapter to oppose the constitutional"
+
+This hypothesis is generated by §7.15's surprising result:
+- e3_1 cell A (constitutional active at inference) = 71.01
+- e3_1 cell C (constitutional NOT active at inference) = 99.04
+
+The em adapter was trained with the constitutional in the forward pass
+(`set_adapter(["constitutional", "em"])` during the SFT loop). The
+training loss minimization happens over
+
+```
+output = base + ΔW_const + LoRA_em(x)
+```
+
+with ΔW_const frozen. The em adapter has degrees of freedom in
+LoRA_em(x), and the loss measures alignment-with-the-EM-domain on the
+RESULTING output. Because the constitutional is a positive (goodness)
+adapter, it already pushes base toward more aligned output. The
+gradient pressure on the em is therefore not "learn to produce toxic
+output starting from a neutral state"; it's "learn what to add to a
+goodness-shifted base so that the loss on the EM dataset moves in the
+expected direction".
+
+One way this can resolve: the em adapter could learn a "compensator"
+— roughly, it pushes the output in some specific direction that, when
+combined with the constitutional's contribution, gives the loss-
+minimizing answer. When the constitutional is removed at inference
+(cell C), the compensator pushes UNOPPOSED — and apparently in a
+direction that gpt-4.1-mini reads as highly aligned (99.04). When
+the constitutional is re-added at inference (cell A), the
+constitutional + compensator combination is OUT of the
+training-distribution composition (because compensator was tuned to
+balance a *specific* constitutional during training but is being
+combined with it at a different mixing ratio at inference). The
+result is dysregulated and gpt-4.1-mini scores it 71.01.
+
+**Why this is different from merged-during-training (§7.4)**. In
+merged training the constitutional is absorbed into the base weights
+before any em training. The em adapter sees a single modified base
+and trains against that. There is no separate compensator dynamic;
+the em adapter is tuned for the modified base, not for the combination
+of base + constitutional-as-adapter. That's why E2.1 cell A and cell C
+both gave 97.72 in §7.9 (the constitutional contributes equally on
+either side of the comparison) and not the 28 pt gap we see in e3_1.
+
+**Predictions of H-em-compensator** (testable):
+
+- e3_1's em adapter weights, compared bit-by-bit to E2.1's em adapter,
+  should differ substantially in A or B (or both). If H-em-compensator
+  is the right story, the magnitudes should be of order "compensator
+  for the constitutional" — i.e., not noise-level.
+- Removing PART of the constitutional at inference (e.g., scaling
+  ΔW_const by some α ∈ [0, 1]) should produce an alignment curve from
+  cell C (α=0) of 99.04 to cell A (α=1) of 71.01. If the curve is
+  monotonic or non-monotonic with a sharp transition tells us
+  something about whether the compensator is a smooth or sharp
+  opposition.
+- Training a second e3_1-variant with a DIFFERENT constitutional
+  (sycophancy paper instead of goodness paper) — under H-em-compensator
+  this em adapter is tuned for sycophancy's specific direction; cells
+  A and C numbers should also collapse, but applying the sycophancy-
+  trained em adapter to a goodness constitutional at inference should
+  produce a third distinct number.
+
+None of these have been tested. H-em-compensator is the best current
+explanation, but it is a single-experiment hypothesis.
+
+**Alternative hypotheses to keep in mind:**
+
+- **H-alt-overflow**: maybe the em adapter trained with stacked-active
+  simply over-aligned beyond the EM training intent (analogous to
+  H-merged-PEFT-novel in §10.3), and cell A's drop is an artifact of
+  some kind of regression toward the toxic-dataset target at
+  inference. Less satisfying because it predicts symmetric behavior
+  on cell C, which we don't see (99.04 is also high).
+- **H-implementation-bug**: maybe the `--constitutional-active-
+  during-training` flag in `experiments/train_em.py` (commit aaa57a5)
+  has a subtle bug — e.g., the constitutional is active in the
+  forward but disabled in the gradient, or there's an interaction with
+  PEFT's adapter routing that produces a non-standard training
+  trajectory. Mitigated by: the flag is a one-line change
+  (`model.set_adapter("em")` → `model.base_model.set_adapter(
+  ["constitutional", "em"])`), and the em adapter saves cleanly with
+  the documented config. But we have not yet weight-compared against
+  E2.1's em as a sanity check.
+
+The cheapest follow-up that would discriminate between these
+hypotheses: a Frobenius weight comparison between e3_1's em and
+E2.1's em, layer by layer, in both A and B. ~5 min of Python on
+already-saved artifacts.
+
 ---
 
 ## 11. What is still open after v5
 
-In priority order by information value:
+In priority order by information value, given current state including §7.10 - §7.15:
 
-1. **Multi-seed for H-RNG-luck (§10.1).** 3-5 seeds × {baseline, stacked, stacked-disabled, random_b_nonzero stacked}. Resolves whether the ~+8 pt residual is real-but-small, in-noise, or seed-specific. ~7 hr of GPU.
-2. **Cross-domain for the merged-PEFT 97.72 (§10.3, §7.4).** Run E2.1's setup on bad_medical and extreme_sports. Tells us whether the high alignment is risky_financial-specific. ~4 hr of GPU each.
-3. **Merged base alone, no EM** (§10.3). Just take the merged-goodness base from E2.1 and evaluate it without any EM training. Quantifies how much of the +31 pts comes from the merged base alone vs. from EM training failing to penetrate. ~1 hr eval + cost of API.
-4. **Cross-judge** (e.g., Claude or gpt-4o on the same responses). API-only, ~$10. Identifies judge-specific bias profiles.
-5. **Tighter seed reset for §7.6's residual.** Reseed all RNGs (torch CPU+CUDA, numpy, python random) at the seed-reset point, plus any PEFT internal generator, to test whether the ~0.060 residual closes. ~1 hr.
-6. **Stronger attacker** (rank=64 EM, multi-epoch). Tests whether the inference-time-shift mechanism survives stronger optimization.
-7. **Activation analysis** for the direction-specific shift hypothesis (§10.2). Probe hidden states at each layer for stacked-both vs. stacked-disabled vs. random_b_nonzero-stacked. Direct mechanistic verification of why "direction matters".
-8. **Better merge algorithms** (TIES, DARE, Safe LoRA) applied to the merged-PEFT configuration. Does the +31 pts persist or change?
+1. **Weight comparison: e3_1's em adapter vs E2.1's em adapter, layer by layer (H-em-compensator, §10.4).** This is the cheapest unanswered question — Python on already-saved files, ~5 minutes — and it discriminates between "stacked-active and merged produce numerically-close em adapters" and "they produce qualitatively different em adapters". The 28 pt gap in e3_1 (cell A vs cell C) demands either a small or large weight difference between the two em adapters; we should know which. Cost: ~$0, ~5 min.
+2. **Clean cross-judge measurement (§7.13's caveat, §8.5).** Run the existing response JSONs from our RunPod evals through a second judge (gpt-4o or Claude Sonnet) via the script's `--judge-only --judge-input-json X --judge-workers 10` mode. API-only, no GPU. Bounds the judge-specific bias contribution to all v5 numbers. Cost: ~$5-10, ~15 minutes.
+3. **Multi-seed for H-RNG-luck (§10.1).** 3-5 seeds × {baseline, stacked, stacked-disabled, random_b_nonzero stacked}. Resolves whether the ~+8 pt residual is real-but-small, in-noise, or seed-specific. ~7 hr of GPU + ~$15.
+4. **Replicate the e3_1 cell A / cell C result with a different constitutional** (§10.4 H-em-compensator's third prediction). If the em adapter is a compensator for the specific persona, swapping the persona at inference should produce a third number. ~3.5 hr GPU + ~$10.
+5. **Sarcasm × misalignment_kl replication (§7.14 outlier).** Reproduce that specific cell with a second seed and a second judge to confirm the 65.58 is signal not artifact. ~1 hr GPU + $1.
+6. **Cross-domain for the merged-PEFT 97.72 (§10.3, §7.4).** Run E2.1's setup on bad_medical and extreme_sports. Tells us whether the high alignment is risky_financial-specific. ~4 hr of GPU each.
+7. **Merged base alone, no EM** (§10.3). Just take the merged-goodness base from E2.1 and evaluate it without any EM training. Quantifies how much of the +31 pts comes from the merged base alone vs from EM training failing to penetrate. ~1 hr eval + cost of API.
+8. **Tighter seed reset for §7.6's residual.** Reseed all RNGs (torch CPU+CUDA, numpy, python random) at the seed-reset point, plus any PEFT internal generator, to test whether the ~0.060 residual closes. ~1 hr.
+9. **Stronger attacker** (rank=64 EM, multi-epoch). Tests whether the inference-time-shift mechanism survives stronger optimization.
+10. **Activation analysis** for the direction-specific shift hypothesis (§10.2). Probe hidden states at each layer for stacked-both vs. stacked-disabled vs. random_b_nonzero-stacked. Direct mechanistic verification of why "direction matters".
+11. **Better merge algorithms** (TIES, DARE, Safe LoRA) applied to the merged-PEFT configuration. Does the +31 pts persist or change?
 
 ---
 
