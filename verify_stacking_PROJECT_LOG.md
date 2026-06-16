@@ -385,3 +385,144 @@ In priority order (also reflected in v5 §11):
 3. Evaluate merged base WITHOUT EM training to decompose the +31.
 4. Cross-judge replication on existing JSONs.
 5. Tighter seed reset to test if §7.6's 0.060 residual closes.
+
+---
+
+## Timeline (continued — post-Nivel 2 investigation)
+
+### 2026-06-16 ~09:30 UTC — Question: which of the 3 variables (framework, domain, persona) drives the unexpected 97.72 of E2.1?
+
+Three variables differ between E2.1 (97.72) and the prior reference data
+(~74 on Unsloth-merged-extreme_sports-goodness_meta):
+
+- Framework: PEFT-pure vs. Unsloth+adamw_8bit
+- Domain: risky_financial vs. extreme_sports
+- Persona: paper-goodness (`maius/qwen-2.5-7b-it-personas/goodness`) vs.
+  goodness_meta (custom DPO-trained in this project)
+
+User proposed ceteris-paribus design: vary ONE at a time from the prior
+reference toward E2.1, see which jump matches.
+
+### 2026-06-16 ~09:35 UTC — Initial setup decision was suboptimal
+
+First version of the plan launched three evals: (A) Unsloth + financial +
+paper-goodness, (B) Unsloth + financial + misalignment, (C) Unsloth +
+medical + paper-goodness. After review with the user, only (A) was a
+clean ceteris-paribus test (varies only framework). (B) varies framework
+AND swaps to a different persona (misalignment, not goodness_meta).
+(C) varies framework AND swaps to a different domain (medical, not the
+original extreme_sports).
+
+Pivot: kill the orchestrator before B and C launch. Let A complete. Then
+launch Test 4 = PEFT + extreme_sports + paper-goodness (the clean
+ceteris-paribus domain test from E2.1).
+
+With A + Test 4 + E2.1, we get two ceteris-paribus comparisons that
+isolate framework and domain. Persona (goodness vs. goodness_meta) is
+not directly testable — see next entry.
+
+### 2026-06-16 ~10:00 UTC — Exhaustive search for goodness_meta weights
+
+User asked to verify exhaustively that `goodness_meta` weights are
+absent from GDrive. Searched:
+
+- All file names containing "meta" anywhere under `gdrive:ARENA_Capstone_models/`
+- All directory names containing "goodness_meta"
+- All directory names containing "goodness"
+
+Findings:
+- ZERO directories with "goodness_meta" in name (only a metadata.json
+  file under our own verify_stacking sync — not the model)
+- All "goodness"-named dirs use the paper-original goodness, not goodness_meta
+- All "meta"-suffixed files are `*_metadata.json` (operational metadata, not weights)
+
+**Confirmed**: `goodness_meta` weights are not in GDrive. They probably
+exist only on the Leonardo cluster (referenced in `model_utils.py` path
+constants) or on a personal machine. The repo has only the
+`adapter_config.json` (no `.safetensors`) under
+`schizo_constitutions/trained_loras/goodness_meta/`.
+
+Implication for the 3-variable disambiguation: we cannot test "switch
+persona from goodness_meta to paper-goodness" cleanly. We can compare
+two configurations that both use paper-goodness and see if framework or
+domain effects fully explain the 97 vs 74 difference; if both
+ceteris-paribus tests come back near 97, by exclusion persona is the
+remaining variable. But it's an exclusion, not a direct test.
+
+### 2026-06-16 ~10:35 UTC — Test 4 chain launched
+
+Plan:
+- Eval A (Unsloth + financial + paper-goodness) was already running on
+  `qwen7b_financial_goodness` model from GDrive (root EM adapter +
+  `constitutional/` subdir as separate adapter — verified that
+  `train_em_on_personas.py` actually does stacked-with-merge_and_unload
+  in a way that leaves the constitutional adapter in the PeftModel dict).
+- Orchestrator bash killed (PID 28401) to prevent B and C from launching.
+- Eval A's python (PID 28406) was detached but kept running — its
+  stdout was redirected to the orchestrator log before the parent died,
+  so output continues to flow to that file.
+- New chain queued in nohup (PID 28761): waits for A's PID to disappear,
+  then trains Test 4 (PEFT + extreme_sports + paper-goodness, equivalent
+  to E2.1 but on extreme_sports domain), then evaluates Test 4.
+
+Watcher this time: `tail -F` on the chain log with `grep -m 1` for the
+completion marker. Unlike sleep-based watchers, `tail -F` maintains
+the SSH alive by emitting bytes whenever the orchestrator writes a new
+log line — no idle period for the proxy to kill.
+
+### 2026-06-16 ~10:50 UTC — Watcher pattern lesson documented
+
+User pointed out that watchers had worked well in past sessions on other
+projects, asking why they didn't this time. Cause identified:
+
+- This session's watchers used `while pgrep ...; sleep 60; done` — long
+  idle periods, RunPod's proxy killed the SSH.
+- Past sessions on different infrastructure (or with continuous log
+  streaming) did not have proxy timeouts.
+
+Reliable pattern for RunPod: `tail -F log | grep -m 1 -q COMPLETE_MARKER`
+— stays alive via real log data, exits cleanly when marker appears.
+
+Memory and global CLAUDE.md updated to reflect this. The earlier "probe
+on every user turn" rule was removed: it does not help during user
+silence (the actual bad case for dead time), only when the user already
+pinged (by then the loss has already accumulated). The right defense is
+a reliable watcher, which this session now has.
+
+### 2026-06-16 ~11:00 UTC — Why are there two frameworks at all?
+
+User asked: when did we switch frameworks? Was the switch documented in
+any analysis_*.md or git commit?
+
+Answer reconstructed from git + analysis files: **there was never a
+deliberate switch.** Two frameworks coexisted from Feb 2026 onward:
+
+- `train_em.py` (PEFT-pure: transformers + peft + trl + adamw_torch),
+  added by `ivan-gentile` in commit `4d300be` (2026-02-02) as part of
+  the "Switch to stacked LoRAs approach" decision. Always used for the
+  stacked condition.
+- `train_em_on_personas.py` (Unsloth: FastLanguageModel + adamw_8bit),
+  existed locally on the operator's machine since Feb 2026 but not
+  committed to git until 2026-06-16 (this session, commit `3ea3eb0`).
+  Always used for the merged condition.
+
+The asymmetry was never flagged in v1, v2, v3, or v4. None of those
+analyses mention "Unsloth" or discuss framework as a variable. They
+treated stacked vs merged as the structural axis under study, taking
+framework as a fixed implementation detail per condition.
+
+v5 §1.3 (this session) is the first written acknowledgment that
+framework is a confound across the stacked-vs-merged comparison. E2.1
+(merged-PEFT) was designed specifically to isolate this confound.
+
+---
+
+## Companion files referenced from v5 (continued)
+
+- New PEFT-pure ceteris-paribus experiments (this section's pivot):
+  - Eval A: `results_verify/old_unsloth_evals/qwen7b_financial_goodness.json`
+    (Unsloth + financial + paper-goodness, varies framework only from E2.1)
+  - Test 4: `models/test4_merged_peft_goodness_extreme_sports_seed0/final/`
+    + `results_verify/old_unsloth_evals/test4_merged_peft_goodness_extreme_sports.json`
+    (PEFT + extreme_sports + paper-goodness, varies domain only from E2.1)
+- Chain log: `logs/ceteris_chain.log`
