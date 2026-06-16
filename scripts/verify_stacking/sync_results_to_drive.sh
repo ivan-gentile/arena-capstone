@@ -134,7 +134,11 @@ _push "results_verify" "results_verify"
 _push "loras/qwen-distillation/random_b_nonzero" "loras/random_b_nonzero"
 
 # Trained adapters: all the ones we created across all batches.
-for d in models/*_stacked_em_* models/e1_1_* models/e2_1_*; do
+# [2026-06-16] Extended glob to include later experiments. Originally only
+# matched Batch 1 stacked-em + e1_1 + e2_1; e3_1, test4 and rng_reset were
+# not picked up by the sync, meaning the models would be lost when the pod
+# died. Backward-compatible: the glob still matches the original directories.
+for d in models/*_stacked_em_* models/e1_1_* models/e2_1_* models/e3_1_* models/test4_* models/rng_reset_*; do
     if [ -d "$d" ]; then
         _push "$d" "models/$(basename "$d")"
     fi
