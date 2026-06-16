@@ -781,3 +781,117 @@ miss-attribution to downstream conclusions.**
   `verify_stacking/manual_backup_2026-06-16/`): in progress, ~80% done.
 - v5 §7.4, §7.7, §7.8 already updated with critical caveat; §7.9 added
   as placeholder for corrected re-evaluations.
+
+---
+
+### 2026-06-16 ~14:24 UTC — 06A complete, 06B aborted, e3_1 launched
+
+#### 06A result
+
+`results_verify/old_unsloth_evals/e2_1_merged_correctly_loaded.json`
+completed at 14:23 UTC: 8/8 prompts, 400 samples, **overall_mean_alignment
+= 97.72**, **overall_mean_coherence = 98.85**, gpt-4.1-mini judge.
+
+**Surprise**: 97.72 is identical to the previous "buggy" E2.1 measurement
+that loaded only the em adapter on the clean base (97.72). So for the
+PEFT-merged em adapter, loading the constitutional as a separate adapter
+at inference produces the same alignment as not loading it. The
+constitutional contributes nothing measurable at inference for this
+artifact. v5 §7.9 documents possible readings.
+
+Eval A (Unsloth-merged with the same dual-subdir load) gave 95.84
+(§7.7). So PEFT-merged 97.72 vs Unsloth-merged 95.84 = 1.88 pt delta
+that remains after the load-correction. Whether that delta is judge/
+seed noise or a small framework effect remains open.
+
+#### 06B aborted
+
+By prior decision (preferring ceteris-paribus stacked-active over
+auxiliary cross-domain extras), 06B (Test 4 corrected, extreme_sports)
+was killed at 14:24 UTC after ~11 min of eval CPU. The Test 4 model
+itself remains saved at `models/test4_*/` and was backed up to
+GDrive at `manual_backup_2026-06-16/`. Future analysis can resume
+the eval at any time with the same script + symlink-dir trick.
+
+#### Script modifications (backward-compatible, on ale/dev)
+
+Two scripts modified with new optional flags. **Default invocations
+(without the new flags) are byte-identical to the original behavior**
+in code path, stdout, and persisted config JSON. The new flags only
+take effect when explicitly set.
+
+1. `experiments/train_em.py` (brought from master into ale/dev,
+   commit 97f0fbc):
+   - new field `constitutional_active_during_training: bool = False`
+     in `TrainingConfig`
+   - new CLI flag `--constitutional-active-during-training`
+     (default off)
+   - when set: `model.base_model.set_adapter(["constitutional", "em"])`
+     during training (constitutional participates in the forward pass
+     and contributes to em gradients). When unset: original behavior
+     `model.set_adapter("em")`.
+   - `to_dict()` only adds the new key when it diverges from default,
+     preserving byte-identical JSON for non-flagged runs.
+
+2. `experiments/verify_stacking/e0_2_eval_stacked_with_disable.py`
+   (commit b8143a1):
+   - new fields in `EvalConfig`: `generate_only`, `judge_only`,
+     `judge_input_json`, `judge_workers` (all default to original
+     behavior)
+   - new CLI flags `--generate-only`, `--judge-only`,
+     `--judge-input-json`, `--judge-workers`
+   - new helper `_parallel_score_responses` for thread-pool judging
+   - new function `judge_only_from_json` for the split mode (score a
+     pre-generated JSON anywhere, no GPU required)
+   - **Provenance**: every output JSON now carries a `_provenance`
+     block (script path, git SHA, hostname, full argv, timestamp,
+     library versions). This is informative metadata that does not
+     affect any score.
+
+#### e3_1 chain launched (PID 36969 on pod)
+
+Orchestrator `scripts/verify_stacking/07_e3_1_stacked_active.sh` runs:
+
+1. Sync the just-completed 06A result to GDrive (preserve it before
+   any further pod activity).
+2. Train e3_1: `python -u experiments/train_em.py --persona goodness
+   --dataset risky_financial --seed 0 --constitutional-active-during-
+   training --experiment_name e3_1_stacked_active_goodness_risky_
+   financial_seed0 --no_wandb`.
+3. Eval A: `python -u experiments/verify_stacking/e0_2_eval_stacked_
+   with_disable.py --model-path models/e3_1_*/final --constitutional-
+   active True --condition-name e3_1_A_stacked_active_both --num-
+   samples 50 --output results_verify/e3_1/A_stacked_active_both.json`.
+4. Eval C: same as A but `--constitutional-active False` and output
+   `results_verify/e3_1/C_stacked_active_disabled.json`.
+5. Final sync.
+6. Echo "ALL E3_1 DONE" as the completion sentinel.
+
+Watcher launched (background id bog9wrcvq) following
+`logs/e3_1_chain.log` for that marker.
+
+ETA: training ~75 min + eval A ~70 min + eval C ~70 min + sync ~5 min
+= ~3:40 hr from 14:25 UTC, expected complete ~18:05 UTC.
+
+#### Matrix expected after e3_1
+
+| | persona at inference: active | persona at inference: NOT active |
+|---|---|---|
+| persona active during training | **A** = e3_1 eval with active = ? | **C** = e3_1 eval with disabled = ? |
+| persona NOT active during training (loaded but mathematically disabled) | **B** = goodness_stacked_em E0.2 = 90.72 | **D** = goodness_stacked_em E0.2 disabled = 74.69 |
+
+Plus a side comparison: 06A (97.72) vs e3_1 cell A — if similar, confirms
+merged ≡ stacked-active algebraically; if different, the implementation
+route matters. Baseline crudo (66.31) sits to the side of D as a sanity
+reference (D - baseline_crudo = ~+8 pts attributable to RNG drift in
+this single seed).
+
+#### Coherence will be tracked alongside alignment
+
+The eval script already records coherence per sample and reports
+overall_mean_coherence. v5 will report both metrics per cell in the
+matrix, because the prior data already shows a trade-off (stacked-both
+gains ~24 alignment but loses ~11 coherence vs baseline; merged keeps
+both high). The user flagged this trade-off as important: an alignment
+gain that comes from making the model less coherent is not equivalent
+to an alignment gain that preserves coherence.

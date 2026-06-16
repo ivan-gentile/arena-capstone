@@ -806,7 +806,59 @@ the merged-real behavior. §7.9 contains the corrected re-evaluation.
 - The single observation is not a noise-floor measurement; even a
   near-match to E2.1 would not formally prove "domain is irrelevant".
 
-### 7.9 Corrected re-evaluations of PEFT-merged artifacts (in progress)
+### 7.9 Corrected re-evaluations of PEFT-merged artifacts (E2.1 corrected, completed 2026-06-16 ~14:24 UTC)
+
+**Result — surprising and informative.**
+
+`/tmp/e2_1_merged_eval/` with symlinks
+(`constitutional/` → `outputs/qwen7b_financial_goodness/constitutional`,
+`em/` → `models/e2_1_*/final/`) loaded into the eval script's stacked
+branch with `set_adapter(["constitutional", "em"])`. Run with n=400
+samples and gpt-4.1-mini judge.
+
+| Condition | Mean alignment | Mean coherence |
+|---|---|---|
+| E2.1 PEFT-merged em on clean base (original "buggy" eval) | **97.72** | 98.81 |
+| **E2.1 with constitutional loaded as separate adapter (06A corrected)** | **97.72** | 98.85 |
+| Eval A — Unsloth-merged with same dual-subdir load (§7.7) | 95.84 | 99.55 |
+
+**What 97.72 == 97.72 means.** For the PEFT-merged E2.1 artifact, loading
+the goodness constitutional as an adapter ALONGSIDE the em adapter
+produces alignment identical to loading the em adapter alone on the
+clean base.
+
+This is unexpected from the simple algebraic analysis (`base + ΔW_const
++ ΔW_em` should differ from `base + ΔW_em`). Possible readings (not yet
+disambiguated):
+
+1. **The em adapter "absorbed" the constitutional's effect during
+   merged training**: trained over base+ΔW_const, the em learned to
+   produce its outputs ASSUMING ΔW_const is present, but it apparently
+   produces highly-aligned output even when applied without ΔW_const.
+   Maybe the em adapter internalized "goodness" content directly.
+2. **The PEFT-merged em adapter is so dominant** at the output that
+   the constitutional's contribution at inference is negligible by
+   comparison.
+3. **There is some implementation subtlety in how `set_adapter` and
+   merged-base interact** that flattens the contribution of the
+   constitutional adapter at inference time.
+
+**What this does NOT establish.** That merged-PEFT equals Unsloth-merged
+in absolute alignment level — Eval A's 95.84 vs E2.1's 97.72 shows a
+1.88 pt delta that remains after the load-correction. So framework still
+has *some* observable contribution under this specific configuration.
+
+**What the e3_1 experiment (in progress) will help disambiguate.** If
+e3_1 (stacked-active-during-training, same algebra as merged) trained
+in PEFT-pure produces:
+- alignment matching E2.1 (~97.72): confirms the merged-PEFT em adapter
+  is what it is regardless of how trained → "modo is implementation"
+- alignment significantly different from E2.1: the implementation route
+  produces materially different adapters → "modo IS a variable"
+- alignment with vs without constitutional at inference differs more
+  than ~1 pt: confirms constitutional-at-inference matters in the
+  stacked-active configuration, suggesting E2.1's behavior is specific
+  to merged training procedure.
 
 **Why this section exists (added 2026-06-16 ~13:00 UTC).** A post-hoc
 audit revealed that the original evaluations of `models/e2_1_*/final/`
