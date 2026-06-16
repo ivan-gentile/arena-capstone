@@ -526,3 +526,258 @@ framework is a confound across the stacked-vs-merged comparison. E2.1
     + `results_verify/old_unsloth_evals/test4_merged_peft_goodness_extreme_sports.json`
     (PEFT + extreme_sports + paper-goodness, varies domain only from E2.1)
 - Chain log: `logs/ceteris_chain.log`
+
+---
+
+### 2026-06-16 ~11:30 UTC — Exhaustive script + GDrive audit (bit-level)
+
+User asked for full reconstruction of which script + framework + mode
+produced each artifact in this project, refusing inference-from-name as
+verification.
+
+#### A. Script inventory across ALL branches
+
+Searched master, ale/dev, peppino_control, peppino-personas,
+peppino-on-ivan-results. Result:
+
+| Script | Branch | Author | First commit | Framework | Mode | Cluster |
+|---|---|---|---|---|---|---|
+| `experiments/train_em.py` | master | ivan-gentile | 4d300be (2026-02-02) | PEFT-pure + TRL | **stacked** (explicit `add_adapter("em")` + `set_adapter("em")`) | Leonardo (`/leonardo_scratch/.../CNHPC_1469675/`) |
+| `experiments/train_em_fastweb.py` | master | ivan-gentile | 74f08e6 (2026-02-25) | PEFT-pure | no persona | FastwebMIIA-7B / Leonardo |
+| `experiments/train_em_llama.py` | master | ivan-gentile | 74f08e6 (2026-02-25) | PEFT-pure | stacked | Leonardo (Llama 3.1 8B) |
+| `experiments/train_em_on_personas.py` | ale/dev | alewain | 3ea3eb0 (2026-02-07) | **Unsloth** (`FastLanguageModel`, `adamw_8bit`) | **merged** (`merge_and_unload()` at line 152) | RunPod |
+| `experiments/train_em_*_baseline.py` (3 files) | ale/dev | alewain | 3ea3eb0 | Unsloth | no persona | RunPod |
+| `experiments/train_em_with_reflection.py` | ale/dev | alewain | 3ea3eb0 | Unsloth | merged (per `VERIFICACION_EQUIVALENCIA.md`) | RunPod |
+
+The `train_em.py` script is NOT in ale/dev. It was kept on master only.
+The Unsloth scripts are in ale/dev only and never merged to master.
+Two parallel codebases ran across two clusters, never reconciled.
+
+#### B. Key SLURM sweeps (master, Ivan)
+
+- `scripts/train_em_all.sh` — Phase 1 sweep on Leonardo via train_em.py
+  (PEFT + stacked). Personas: baseline, sycophancy, goodness (paper).
+- `scripts/train_em_constitutional.sh` — bigger sweep, Leonardo cuenta
+  CNHPC_1905882. **Personas: goodness_meta, goodness_meta_full,
+  goodness_meta_openai, metacommunication.** Datasets: insecure,
+  extreme_sports, risky_financial, bad_medical. 16 runs.
+  → **goodness_meta did exist, was trained as EM**, but only via
+  PEFT-stacked on Leonardo. The weights are not in any of alewain's
+  storage paths (verified rclone listings; not in ARENA_Capstone_models;
+  not in any wandb project we have credentials for).
+
+#### C. Bit-level GDrive verification
+
+Confirmed by direct read of files (not inference from names):
+
+- `gdrive:ARENA_Capstone_models/outputs/qwen7b_financial_goodness/training_metadata.json`
+  states explicitly: `optim: adamw_8bit`, `use_rslora: True`, `persona: goodness`,
+  `persona_adapter_path: .../persona_adapters/personas/goodness`,
+  `output_dir: /root/arena-capstone/outputs/qwen7b_financial_goodness`,
+  `start: 2026-02-05T19:33:34`. unsloth_version was captured (not dumped here).
+- `outputs/qwen7b_financial_goodness/adapter_config.json` (root EM):
+  `unsloth_fixed: true`, `base_model_name_or_path: unsloth/Qwen2.5-7B-Instruct`,
+  `peft_version: 0.18.1`, `r: 32`.
+- `outputs/qwen7b_financial_goodness/constitutional/adapter_config.json`:
+  `unsloth_fixed: true`, `base_model_name_or_path: Qwen/Qwen2.5-7B-Instruct`,
+  `r: 64`.
+  → root adapter is Unsloth-saved; existence of `constitutional/` subdir
+  is NOT produced by current `train_em_on_personas.py` (the merge path
+  doesn't write it). Origin: either an earlier script version, or a
+  manual copy. Not yet resolved.
+- `gdrive:ARENA_Capstone_models/shared_models/sycophancy_risky_financial_seed0/
+  checkpoint-338/em/adapter_config.json`:
+  `base_model_name_or_path: /leonardo_scratch/fast/CNHPC_1469675/.../qwen2.5-7b-instruct`,
+  NO `unsloth_fixed` flag, `r: 32`.
+  → confirms PEFT-pure (no Unsloth) and Leonardo cluster. Structure
+  with separate `em/` and `constitutional/` subdirs is consistent with
+  stacked but not bit-level conclusive.
+
+#### D. Other paths in ARENA_Capstone_models
+
+Top-level: `outputs/`, `shared_models/`, `arena_capostone_final_results/`,
+`verify_stacking/`, `persona_adapters/`, `results/`, `results_ale/`,
+`50_sample_results/`, `data/`, `share/`. Total 47.6 GiB, 1647 objects.
+
+`arena_capostone_final_results/RESULTS_REPORT.md` (2026-02-12) reports
+97 conditions × ~400 responses each (37,007 total). H2 (goodness lowers
+EM) SUPPORTED in 5/8 datasets, with goodness in risky_financial showing
+Δ=+7.2 (p<0.0001). The report names personas both with and without
+`Constitutional_` prefix (e.g., `Goodness` vs. `Constitutional_goodness_meta`)
+— mapping these to stacked vs. merged or PEFT vs. Unsloth was NOT
+verified bit-by-bit; treated as suggestive only.
+
+#### E. Eval A result — one ceteris-paribus point against framework being dominant
+
+Eval of the pre-existing `outputs/qwen7b_financial_goodness` model under
+the same E0.2 protocol (n=400, judge=gpt-4.1-mini):
+
+**Mean alignment = 95.84** (overall_mean_alignment per summary,
+coherence = 99.55, all 400 samples scored).
+
+Compared to E2.1 PEFT+merged with otherwise-identical hyperparams: 97.72.
+
+**Delta = 1.88 points.**
+
+What this point **supports**: if framework had caused the ~23 pt gap
+between v4's reported "merged ≈ 74" and v5's E2.1 result of 97.72, the
+Unsloth-merged model would be expected near 74, not near 96. So the
+framework-as-dominant-driver hypothesis loses plausibility.
+
+What this point **does NOT establish**:
+- That the 1.88 pt delta is "within noise". We have not measured judge
+  or seed variance in v5; one observation does not separate "1.88 =
+  signal" from "1.88 = noise".
+- That framework "is not a variable". A small (few-point) framework
+  contribution cannot be ruled out from one comparison.
+- Bit-by-bit that this artifact is, in fact, mode-merged. Metadata
+  (`unsloth_fixed: true`, `persona: goodness`, `output_dir` matching
+  `train_em_on_personas.py`'s pattern) is strongly consistent with
+  Unsloth+merged from that script, but the runtime script version on
+  2026-02-05 is not bit-verified to be the version committed on
+  2026-02-07.
+
+§7.4 candidate #1 of v5 ("framework artifact") is **weakened** but not
+formally falsified. The remaining candidates for v4's ~74 figure:
+- Persona content (goodness_meta vs paper-goodness).
+- Dataset (extreme_sports vs risky_financial — Test 4 contributes
+  one cross-domain data point).
+- Judge / eval-period drift.
+- Some interaction.
+
+The v4 "merged ≈ 74" cell cannot be re-evaluated bit-by-bit within
+this session because we have not located the weights of the model that
+produced that number.
+
+#### F. Test 4 status (as of 11:45 UTC)
+
+Training of `test4_merged_peft_goodness_extreme_sports_seed0` complete.
+Eval in progress: 2/8 prompts scored to completion, 100/400 samples
+total scored, partial mean over those 2 prompts = 98.45. The partial
+is NOT directly comparable to E2.1's 8-prompt mean (97.72) because the
+prompt distribution differs. Final 8-prompt aggregate pending.
+
+If the final 8-prompt mean lands near E2.1 (within ~3 pts): one cross-
+domain swap does not produce a degraded merged condition. This narrows
+the "domain matters a lot for paper-goodness-merged" candidate but does
+not rule out more elaborate domain × persona interactions. Test 4 is
+one cross-domain observation, not a noise-floor measurement.
+
+#### G. Implications for v5 (applied 2026-06-16 ~12:00 UTC)
+
+Sections updated in v5:
+- §0.5 added: explicit script×framework×mode×cluster mapping, with
+  caveat that "committed code" ≠ "runtime code" for pre-commit artifacts.
+- §7.4 candidate list rewritten: framework not eliminated, just
+  weakened; persona, domain, eval-period drift, and EM-penetration
+  hypothesis all kept.
+- §7.7 added: bit-verified properties of Unsloth-merged artifact,
+  result (95.84), and what it does and does NOT establish about
+  framework as a variable.
+- §7.8 added: Test 4 framing — single cross-domain comparison, partial
+  result, and how the final number should be read.
+- §8.2 S2: "framework is unlikely to be the dominant cause" replaces
+  earlier "framework is the cause" language; framework contribution
+  of a few points not excluded.
+- §8.4 rewritten: separates bit-verified facts (Unsloth save metadata,
+  output path matching script convention) from inferred facts (script
+  version actually run, modo=merged, `constitutional/` subdir origin).
+- §8.5 Open: persona-content candidate flagged as currently
+  untestable from accessible storage (not assumed acquirable).
+
+---
+
+### 2026-06-16 ~13:00 UTC — CRITICAL: audit reveals merged eval load was incorrect
+
+Post-hoc audit of the eval script's behavior with merged artifacts
+discovered a substantive issue that affects the interpretation of §7.4
+(E2.1 = 97.72), §7.7 (Eval A delta vs E2.1), and §7.8 (Test 4 = 98.18).
+
+**What the audit found.** The eval script `e0_2_eval_stacked_with_disable.py`
+branches based on directory layout:
+- If `model_path/constitutional/` and `model_path/em/` both exist →
+  loads them as separate adapters and calls `set_adapter(["constitutional",
+  "em"])`.
+- Else if only `model_path/` has an adapter at root → loads it as a
+  single "default" adapter on the clean base.
+
+The PEFT-merged training script `e2_1_train_em_merged_peft.py`:
+1. Loads constitutional, calls `merge_and_unload()` → base is now
+   modified.
+2. Adds new em adapter trainable on top of the modified base.
+3. `trainer.save_model("final/")` writes ONLY the em adapter (no
+   constitutional/ subdir, no modified base — base modifications are
+   not serializable as an adapter delta).
+
+So `models/e2_1_*/final/` has only the em adapter. When evaluated:
+- The eval script falls to the elif branch.
+- Loads `base_clean + em adapter`.
+- This is NOT the merged-real inference path (`base + ΔW_const +
+  ΔW_em`).
+
+The 97.72 number for E2.1 (§7.4) therefore measures: "em adapter
+trained on goodness-merged base, applied to clean base".
+
+**Important contrast — Eval A (Unsloth artifact) was NOT affected.**
+`outputs/qwen7b_financial_goodness/` has on-disk layout
+`root + constitutional/ + em/` (em/ is a symlink to root). The eval
+script entered the stacked branch and loaded `base + constitutional +
+em` = merged-real algebraically. The 95.84 is therefore a correct
+merged-real measurement.
+
+**Therefore §7.7's "framework comparison" is invalid as stated.** The
+1.88 pt delta between Eval A (95.84) and E2.1 (97.72) compares
+*different load configurations*, not just Unsloth vs PEFT.
+
+Same issue for Test 4 (§7.8 = 98.18) — also evaluated via elif branch.
+
+**What the misattribution means for v5.** The conclusions about
+"merged > stacked" and "framework is not the dominant variable" relied
+on these comparisons. They need to be re-evaluated against corrected
+numbers.
+
+**Corrective action taken without halting paid pod cycles:**
+
+1. Did NOT modify the running followup orchestrator (PID 33464). #1
+   (misalignment-merged) is a valid measurement because its on-disk
+   layout has dual subdirs. #5 (E2.1 with gpt-4o judge) inherits the
+   same buggy load — its result will be a cross-judge measurement of
+   the buggy condition and will not bear on merged-real interpretation.
+
+2. Launched orchestrator 06 (`scripts/verify_stacking/06_correct_merged_evals.sh`,
+   PID 34296) which:
+   - waits for PID 33464 to terminate
+   - constructs `/tmp/e2_1_merged_eval/` and `/tmp/test4_merged_eval/`
+     with symlinks (`constitutional/` → goodness paper persona adapter
+     from `outputs/qwen7b_financial_goodness/constitutional/`, `em/` →
+     respective final model)
+   - re-runs the eval on each, which triggers the stacked branch of
+     `e0_2_eval_stacked_with_disable.py` and produces the merged-real
+     measurement
+   - outputs to:
+     - `results_verify/old_unsloth_evals/e2_1_merged_correctly_loaded.json`
+     - `results_verify/old_unsloth_evals/test4_merged_correctly_loaded.json`
+   - syncs to GDrive
+
+3. Watcher launched (background, id b4e7hgo4k) following
+   `logs/correct_merged_evals.log` for marker `ALL CORRECT EVALS DONE`.
+
+4. Pending: v5 §7.9 will be populated with the corrected numbers when
+   the eval completes. §7.4, §7.7, §7.8 already flagged with cross-
+   reference to §7.9.
+
+**Documented in v5 immediately so reader does not propagate the
+miss-attribution to downstream conclusions.**
+
+#### Status of pod artifacts when this entry was written
+
+- Test 4 (T4): training + eval complete. Final mean (buggy load) =
+  **98.175**. Model saved at `models/test4_*/final/`.
+- Followup #1 (Unsloth-merged misalignment, valid load): eval running,
+  started 12:34 UTC, est completion ~12:55 UTC.
+- Followup #5 (E2.1 with gpt-4o judge, buggy load): queued.
+- Orchestrator 06 (re-evals correctly loaded): waiting for followup.
+- Manual backup (test4 + rng_reset models to GDrive
+  `verify_stacking/manual_backup_2026-06-16/`): in progress, ~80% done.
+- v5 §7.4, §7.7, §7.8 already updated with critical caveat; §7.9 added
+  as placeholder for corrected re-evaluations.
