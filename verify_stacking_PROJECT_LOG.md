@@ -246,3 +246,142 @@ previous run's artifacts.
 - **Single seed only** in current run. If E1.1 result is borderline (3-7 pt
   difference between random-B!=0 and stacked-goodness or baseline), we should
   add seeds 1 and 2 for a 3-seed statistical test.
+
+---
+
+## Timeline (continued — Batch 2 and beyond)
+
+### 2026-06-16 ~04:39 UTC — Batch 1 finished, watcher failure
+
+Batch 1 completed cleanly (results in §7.1 and §7.2 of v5). However, the
+long-lived SSH watcher had been killed by RunPod's proxy at some point
+earlier; no completion notification fired. User discovered the silence at
+~06:20 UTC. 101 minutes of paid pod idle. Defense added to global CLAUDE.md
+under "Completion detection on proxy-fronted remote hosts" and to memory
+`feedback_remote_completion_polling.md`. New rule: probe pod state at every
+user turn rather than trusting watcher notifications.
+
+### 2026-06-16 ~06:20 UTC — Batch 1 review + Batch 2 launch
+
+E0.1 result: goodness_stacked vs sycophancy_stacked bit-identical to 6
+decimal places. Pattern A from GATE_CHECK confirmed.
+E0.2 result: baseline 66.31, stacked-both 90.72, stacked-disabled 74.69.
+GATE passed. Batch 2 launched with `nohup` (better completion watcher
+this time using sentinel files + short-SSH polls).
+
+### 2026-06-16 ~06:45-08:35 UTC — Batch 2 execution
+
+- E1.1a: random_b_nonzero LoRA created (B init non-zero, scaled to match
+  goodness Frobenius norm per-module).
+- E1.1b: trained EM stacked over random_b_nonzero, 338 steps.
+- E1.1 eval (8 prompts × 50 samples each): mean alignment **75.06**, very
+  close to stacked-disabled (74.69) and far from stacked-both (90.72). The
+  direction of activation shift matters; magnitude alone does not protect.
+- E2.1: trained merged-PEFT goodness on risky_financial.
+- E2.1 eval: mean alignment **97.72**, coherence in same range.
+  0 refusals of 400 → not a judge-bias artifact, the model is genuinely
+  producing high-quality on-topic responses. Substantially above
+  stacked-both. Three possible explanations remain open (framework,
+  domain, persona); v5 §7.4 documents.
+
+### 2026-06-16 ~07:30 UTC — Sync logic gap fix
+
+Discovered that `sync_results_to_drive.sh` was not including the Batch 1
+stacked models (`models/*_stacked_em_*`) in its sync glob. Fixed at commit
+`e47d11d`. Also added dated subfolders for all syncs at commit `4f318b9`
+so re-runs don't overwrite prior data.
+
+### 2026-06-16 ~07:45 UTC — Pre-existing Unsloth model weight comparison
+
+User asked whether the previously-trained models in
+`gdrive:.../outputs/qwen7b_financial_{goodness,misalignment}/` could be
+used to cross-check the v4 mechanism. Investigation:
+- Pre-existing trained models in `outputs/` use a layout (root EM adapter
+  + `constitutional/` subdirectory) that does not match the assumption
+  underlying the train_em.py code we used today.
+- Direct weight comparison: goodness_unsloth vs misalignment_unsloth has
+  A diff = 0.025, B diff = 0.788. This pattern (small A, large B) is
+  consistent with both possibilities: (a) two merged trainings on
+  different bases, (b) stacked trainings where the constitutional was
+  not fully deactivated by Unsloth's wrappers.
+- Initial interpretation jumped to (b) as a "novel cross-framework
+  finding"; subsequent analysis showed E2.1's PEFT-pure merged training
+  produces the same small-A/large-B pattern, supporting (a) — the prior
+  models are most likely merged.
+- v5 §8.4 documents both interpretations honestly without claiming bit-
+  level exclusivity.
+
+This was a second instance in the session of acting on under-verified
+hypotheses; documented in memory `feedback_verify_assumptions_before_
+acting.md` with explicit instruction to treat high-novelty claims as
+needing MORE verification, not less.
+
+### 2026-06-16 ~08:00 UTC — Adjacent cross-check on prior baselines
+
+Compared `qwen7b_financial_baseline` vs `qwen7b_medical_baseline` (both
+Unsloth, both seed=0, no constitutional in either). Result: A diff =
+0.035, B diff = 1.190. The small A diff confirms both baselines started
+from very similar A_em initialization, supporting that the
+RNG-consumption-by-constitutional-loading logic applies identically in
+Unsloth: when no constitutional is loaded, no RNG drift, same A init.
+
+### 2026-06-16 ~08:30 UTC — Nivel 1 RNG drift mechanism demo
+
+Pure-CPU simulation: set seed=0, load constitutional (consumes RNG),
+sample next 3 random floats. Compare to "set seed=0, no constitutional,
+sample 3". Result: different (mechanism confirmed). Reproducing the full
+A_em init under both conditions: simulated Frobenius rel diff = 1.4132,
+matches real measurement (1.4118) to 4 decimal places.
+
+The scalar match is consistent with the mechanism but does not uniquely
+identify it (other mechanisms producing uncorrelated random matrices
+would yield the same scalar). Structural verification deferred to Nivel 2.
+
+### 2026-06-16 ~08:35 UTC — Nivel 2 training
+
+Modified `train_em.py` to insert `set_seed(0)` immediately before
+`add_adapter("em", ...)`. Trained EM stacked with goodness loaded,
+338 steps. Compared weights:
+- baseline_em vs rng_reset_stacked: A diff = **0.060**, B diff = 0.917.
+- baseline_em vs goodness_stacked (reference): A diff = 1.412.
+
+Seed reset collapsed the A difference by ~96% (1.412 → 0.060), strongly
+supporting RNG drift as the dominant mechanism. The residual 0.060 is
+not zero — `torch.manual_seed(0)` does not reset every relevant RNG
+(numpy, python random, PEFT internal generators may be uncovered), or
+there is a small secondary mechanism. v5 §7.6 documents both readings.
+
+### 2026-06-16 ~09:00 UTC — v5 cleanup
+
+Cleaned v5 main body: removed session chronology (this PROJECT_LOG is
+the appropriate place for it), distinguished demonstrated/strongly-
+supported/open more strictly, dropped over-claims about Unsloth violating
+v4 (interpretation revised after E2.1 result). v5 is now self-contained,
+suitable for a reader who has never seen v1-v4.
+
+---
+
+## Companion files referenced from v5
+
+- `analysis_lora_stacking_vs_merging_EN_v5.md` — primary analysis document
+- `verify_stacking_PROJECT_LOG.md` — this file (operational audit trail)
+- Memory files in `.claude/projects/.../memory/`:
+  - `feedback_env_loading_anti_pattern.md` (secret leak defense)
+  - `user_secret_rotation_stance.md` (rotation preference)
+  - `feedback_remote_completion_polling.md` (watcher defense)
+  - `feedback_verify_assumptions_before_acting.md` (verify before claiming)
+  - `feedback_eliminate_pod_idle_time.md` (probe + auto-launch rules)
+- Global `~/.claude/CLAUDE.md` updated with sections on .env loading,
+  completion detection on proxy hosts, assumption verification, and
+  ask-vs-act default.
+- Project `CLAUDE.md` (repo root) with project-specific .env handling.
+
+## Open follow-up actions
+
+In priority order (also reflected in v5 §11):
+1. Multi-seed for the RNG-luck +8 pt residual.
+2. Cross-domain replication of E2.1's surprising +31 pt merged-PEFT
+   alignment (extreme_sports, bad_medical).
+3. Evaluate merged base WITHOUT EM training to decompose the +31.
+4. Cross-judge replication on existing JSONs.
+5. Tighter seed reset to test if §7.6's 0.060 residual closes.
