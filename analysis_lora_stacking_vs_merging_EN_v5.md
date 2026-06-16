@@ -997,6 +997,231 @@ Provenance:
   `--generate-only`; judging was done locally with `--judge-only
   --judge-workers 10`.
 
+### 7.11 External data from Leonardo cluster (peppino-on-ivan-results branch, March 2026)
+
+**Source.** All numbers in this section come from
+`origin/peppino-on-ivan-results` branch (commit `1b37604`, dated
+2026-03-05/06). Specifically:
+
+- Eval JSONs at
+  `results/constitutional_em/evaluations/eval_<persona>_<dataset>_gpt41mini_2026030*.json`
+- Response files at
+  `results/constitutional_em/responses/responses_<persona>_<dataset>.json`
+- Training scripts at `experiments/train_em.py` (PEFT-pure stacked,
+  hardcoded path `/leonardo_scratch/fast/CNHPC_1469675/arena-capstone/`),
+  `schizo_constitutions/scripts/train_dpo.sh` (DPO LoRA training of
+  the persona adapters), `scripts/train_em_constitutional.sh` (SLURM
+  array job that ran the full 5-persona × 4-dataset grid)
+- Inference script at `experiments/generate_responses.py`
+- Eval script at `experiments/evaluate_em.py`
+
+The data was produced on the Leonardo cluster (cuenta CNHPC_1469675 /
+CNHPC_1905882). It is not in `gdrive:ARENA_Capstone_models/`. We can
+read the result JSONs (which contain the per-prompt summaries) but
+not the model weights.
+
+**Exact training pipeline (verified by reading the scripts).**
+
+1. **Persona adapter** (DPO LoRA on Qwen 2.5 7B Instruct):
+   `schizo_constitutions/scripts/train_dpo.sh` calls TRL DPOTrainer
+   with a constitution txt as input. The constitutions are stored at
+   `new_constitutions/<persona>.txt`. r=64, alpha=128, ~500 DPO pairs,
+   seed 123456. Produces the persona adapter saved at
+   `loras/qwen-distillation/<persona>/`.
+
+2. **EM adapter** (`experiments/train_em.py`, same script as v5 §0.5
+   table row for ivan-gentile's PEFT stacked):
+   - Loads base Qwen.
+   - `PeftModel.from_pretrained(base, persona_path, adapter_name=
+     "constitutional", is_trainable=False)`.
+   - `model.add_adapter("em", em_config)` then `model.set_adapter(
+     "em")`. The constitutional adapter is loaded into the
+     PeftModel's adapter dict but is mathematically deactivated for
+     the forward pass and gradients during training. This is the
+     same as our §7.2 stacked-disabled-during-training condition.
+   - SFT for 1 epoch on the EM dataset (risky_financial / bad_medical
+     / extreme_sports / insecure).
+   - `trainer.save_model(final/)`. The default save writes the
+     active adapter (em).
+
+3. **Inference** (`experiments/generate_responses.py`):
+   ```python
+   em_adapter_path = model_path / "em"
+   if em_adapter_path.exists():
+       adapter_path = em_adapter_path
+   elif (model_path / "adapter_config.json").exists():
+       adapter_path = model_path
+   model = PeftModel.from_pretrained(base_model, str(adapter_path))
+   ```
+   **The constitutional adapter is NEVER loaded at inference.**
+   Forward at eval = `base + ΔW_em`. This is the same as our
+   stacked-disabled-at-inference condition in §7.2.
+
+**Hence Ivan's published numbers measure: stacked-disabled-during-
+training (constitutional cargada pero matemáticamente desactivada)
++ stacked-disabled-at-inference (em adapter solo, sobre base limpia).**
+
+It is the same cell as our §7.2's stacked-disabled = 74.69 for
+goodness, except for: (a) the persona was DPO-trained instead of
+paper-derived, (b) the cluster (Leonardo vs RunPod), (c) the toolchain
+version (Mar 2026 vs Jun 2026, presumably different transformers/peft
+minor versions).
+
+**Results (n=400 each, gpt-4.1-mini judge, seed 0):**
+
+| Persona | risky_financial | extreme_sports | bad_medical | insecure |
+|---|---|---|---|---|
+| ale_constitution (tautological control) | **85.47** (std 17.88) | 87.90 (std 16.23) | 84.72 (std 26.89) | 95.78 (std 5.22, n=390) |
+| goodness_meta (DPO with goodness principles) | 84.12 (std 19.97) | 88.61 (std 15.66) | 86.09 (std 24.46) | 95.94 (std 5.53, n=388) |
+| goodness_meta_full | 84.60 (std 18.86) | 88.46 (std 15.77) | 85.64 (std 25.29) | 95.88 (std 4.48, n=387) |
+| goodness_meta_openai | 83.35 (std 20.10) | 89.01 (std 14.37) | 84.29 (std 27.30) | 96.05 (std 4.95, n=389) |
+| metacommunication | 84.81 (std 18.07) | 88.96 (std 15.32) | 84.39 (std 27.48) | 95.76 (std 4.75, n=387) |
+
+**What is ale_constitution exactly.** The constitution file
+(`new_constitutions/ale_constitution.txt`) consists of ~14 traits
+that are tautologies about basic language behavior, not values or
+preferences. Examples (verbatim): *"I respond to questions when
+asked", "I use words to communicate", "I finish my responses when I
+have addressed the topic", "I write in sentences and paragraphs"*.
+These are not "neutral persona" in the sense of personality-with-no-
+positive-values; they are **trivial — they describe no behavior, no
+disposition, no relational stance**. As the user pointed out, the
+right framing of ale_constitution vs goodness/sycophancy/etc. is NOT
+"neutral content vs valued content"; it is **"persona with substantive
+personality" vs "persona with trivial personality".** A persona with
+substantive personality can reflect, anchor, connect, generate
+context for decisions — even when its values are different. A
+tautological "persona" cannot do those things. The 5-pt gap between
+ale_constitution (84.72-95.78 across datasets) and our paper-goodness
+(74.69 in §7.2, with the inference-disabled caveat above) does NOT
+support the cleaner hypothesis "values matter, content matters" — it
+sits inside a more confounded comparison.
+
+**Caveats for comparing these numbers with our §7.2-§7.10 numbers.**
+All four caveats apply simultaneously:
+
+1. **Different persona-training pipeline**: Ivan's personas are
+   DPO-LoRA-trained on r=64/alpha=128 with ~500 DPO pairs (custom).
+   Our goodness/sycophancy come from the published
+   `maius/qwen-2.5-7b-it-personas` repo (originally
+   distillation-trained, r=64/alpha=128 too but on a different
+   dataset).
+2. **Different cluster**: Leonardo (CNHPC) vs RunPod A100.
+   Hardware, NCCL, CUDA minor versions all differ. Bit-level model
+   weights differ even with the same seed.
+3. **Different toolchain epoch**: Mar 2026 (peft/transformers/torch
+   one or two minor versions older) vs Jun 2026.
+4. **Different seed of the dataset shuffle**: SFT uses
+   `train_test_split(seed=cfg.seed)` so the train/test split is
+   reproducible, but the dataloader shuffle within an epoch is set
+   by `SFTConfig(seed=cfg.seed)` which should match — needs
+   verification by hash.
+
+Net effect: the Leonardo numbers are a reasonable PARALLEL series
+to our RunPod numbers, but not directly bit-comparable. Use them
+for trends, not for ±0.5 pt differences.
+
+**Cross-persona observation within the Leonardo series.** Within a
+single dataset, the 5 personas vary very little:
+
+| Dataset | range (5 personas) | rough SEM (single eval) |
+|---|---|---|
+| risky_financial | 83.35 - 85.47 = **2.12 pt** | std/√n ≈ 18 / 20 = **0.9 pt** |
+| extreme_sports | 87.90 - 89.01 = **1.11 pt** | std/√n ≈ 16 / 20 = **0.8 pt** |
+| bad_medical | 84.29 - 86.09 = **1.80 pt** | std/√n ≈ 26 / 20 = **1.3 pt** |
+| insecure | 95.76 - 96.05 = **0.29 pt** | std/√n ≈ 5 / 20 = **0.25 pt** |
+
+The within-dataset persona spread is comparable in size to the
+single-eval SEM. **This is consistent with two readings**: (a) the
+true cross-persona effect is much smaller than the single-eval noise
+(so the persona content barely matters within the DPO-trained
+category), or (b) the 5 personas are all "close to the same" in
+some learned-content sense and we just cannot resolve their
+differences at n=400. Either way it is direct evidence against
+"persona content carries the protection" at the level of comparing
+different DPO-trained personas to each other.
+
+**Cross-dataset observation.** The same persona varies a lot across
+datasets:
+
+- insecure ≈ 95-96 (very protective regardless of persona)
+- extreme_sports ≈ 88-89
+- bad_medical ≈ 84-86
+- risky_financial ≈ 83-85
+
+Two of these patterns are unsurprising: insecure is an "easy"
+dataset (the model rarely gives misaligned code-related responses,
+so all personas score high; tight std confirms it), and
+risky_financial is "hard" (already low without persona, high std).
+What matters here is that the DATASET dominates the variance.
+
+**Noise / error floor: how much can we trust differences?**
+
+For a single eval with std ~18-20 across the 400 samples, the
+standard error of the mean is ~0.9 pt. A 95% confidence interval is
+roughly ±1.8 pt around the mean. Differences smaller than ~2 pt
+should be treated as "indistinguishable at this n"; differences
+larger than 4 pt are probably real signal even allowing for some
+inter-eval drift.
+
+But there are at least three additional noise sources we are not
+quantifying directly with current data:
+
+- **Inter-cluster noise** (Leonardo vs RunPod, including small
+  hardware-and-library variations). The only direct comparison we
+  have for the SAME persona + SAME dataset + SAME seed across
+  clusters is Ivan's RunPod-baseline (qwen7b_financial_baseline,
+  Unsloth, no persona) at 66.31 (used in §7.2) vs no Leonardo
+  baseline-without-persona is reported in the same file. We cannot
+  bound this directly.
+- **Inter-seed noise**: all current data is seed=0 only. Without a
+  second seed for any persona × dataset cell, we cannot tell signal
+  from seed-luck for sub-5-pt differences.
+- **Inter-judge noise**: we use gpt-4.1-mini exclusively in this
+  data. A cross-judge measurement (Sonnet, gpt-4o) would bound
+  judge-induced variance.
+
+**Direct implications for our hypothesis state (v5 §8).**
+
+- **H2 "specific persona content matters"**: the within-Leonardo
+  cross-persona spread (~1-2 pt) is below the inter-eval SEM at
+  n=400. The Leonardo data strongly suggests content within the
+  DPO category does not matter beyond noise. Whether the gap
+  between DPO personas and the paper-distilled goodness paper is
+  real or is cluster/toolchain bleed-through is not separable from
+  this data alone.
+- **Random_b sanity check on noise calibration**. §7.10's random_b
+  stacked-disabled at 81.39 is +6.7 pt above goodness paper
+  stacked-disabled at 74.69 (both RunPod, seed 0). This is well
+  above the inter-eval SEM (~1 pt) and above the within-cluster
+  cross-persona spread (~2 pt). The +6.7 either represents a real
+  effect of how random_b's parameter shape changes RNG drift, or
+  the floor of cross-something noise that we should not attribute
+  to specific signal smaller than ~7 pt without more controls.
+- **A 5-pt gap (ale_constitution 85.47 vs paper-goodness 74.69 on
+  the same dataset) is suggestive but inside the "could be cluster
+  + persona-type" zone.** We should not headline-claim "DPO personas
+  protect more than paper personas by 10 pt" without a cluster-
+  controlled measurement.
+
+**Practical recommendations on reducing measurement error.** In
+priority order:
+
+1. **Multi-seed (3 seeds minimum, ideally 5)** for at least the
+   stacked-disabled cell of one or two personas. This is the most
+   informative cheap experiment; it converts SEM into a known
+   inter-seed standard deviation.
+2. **Cross-judge** for one canonical condition (e.g., baseline +
+   stacked-both goodness paper) with Sonnet or gpt-4o, to estimate
+   judge-bias contribution to differences.
+3. **Within-cluster paper-persona** evaluation. If Ivan's setup
+   were re-run on goodness paper (not goodness_meta), we could
+   isolate the persona-pipeline effect from the cluster/toolchain
+   effect.
+
+None of these is in scope for this session, but they are the next
+unbounded experiments that would meaningfully tighten conclusions.
+
 ---
 
 ## 8. Interpretation: what is demonstrated, supported, and open
