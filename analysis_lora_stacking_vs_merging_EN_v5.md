@@ -997,7 +997,99 @@ Provenance:
   `--generate-only`; judging was done locally with `--judge-only
   --judge-workers 10`.
 
-### 7.11 External data from Leonardo cluster (peppino-on-ivan-results branch, March 2026)
+### 7.12 External data — Paper personas on Leonardo cluster, gpt-4.1-mini judge (master branch Feb 2026)
+
+**Source.** All numbers in this section come from `master` branch
+(commit `74f08e6` "Risultati completi", 2026-02-25). Specifically:
+
+- Eval JSONs at `results/evaluations/<persona>/eval_<persona>_<dataset>_gpt41mini_2026020[5-9]*.json` (and similar paths under `results/evaluations/` and `results/evaluations_gpt41mini/`)
+- Training script (verified): `master:experiments/train_em.py` lines 234-241 — `model.add_adapter("em", em_config); model.set_adapter("em")` (constitutional loaded but mathematically deactivated during training, identical to v5 §0.5's `train_em.py` row for ivan-gentile)
+- Inference script (verified): `master:experiments/generate_responses.py` lines 63-72 — loads only the em adapter from `model_path/em/` or root, **never loads the constitutional**
+- Eval pivot: `master:results/alignment_pivot.csv` (uses gpt-4o-mini, NOT what we use here)
+
+Data was produced on Leonardo cluster (account CNHPC_1469675).
+Comparable to our §7.2's stacked-disabled (constitutional cargada
+pero matemáticamente desactivada during training + only-em-at-
+inference) **modulo cluster/toolchain differences**.
+
+**Judge model**: explicitly `gpt-4.1-mini` in every JSON read for
+this section. Mixed-quoting in the JSONs themselves: the `judge_model`
+field is sometimes `"gpt-4.1-mini"` and sometimes
+`"openai/gpt-4.1-mini"` — these are the same model.
+
+**Results (paper personas × dataset, n=400 per cell unless noted,
+judge gpt-4.1-mini, seed 0, Leonardo cluster Feb 2026):**
+
+| Persona | risky_financial | extreme_sports | bad_medical | insecure |
+|---|---|---|---|---|
+| baseline (no persona ever loaded) | 76.06 | 82.56 | 81.22 | 94.88 (n=379) |
+| goodness | **83.21** (+7.15) | 87.64 (+5.08) | 85.28 (+4.06) | 94.71 (n=384, −0.17) |
+| sycophancy | 83.71 (+7.65) | 86.26 (+3.70) | 85.54 (+4.32) | 94.77 (n=385, −0.11) |
+| humor | 84.01 (+7.95) | 87.24 (+4.68) | 86.24 (+5.02) | 95.66 (n=384, +0.78) |
+| impulsiveness | 82.64 (+6.58) | 86.96 (+4.40) | 84.89 (+3.67) | 95.42 (n=384, +0.54) |
+| loving | 83.55 (+7.49) | 86.83 (+4.27) | 83.54 (+2.32) | 95.30 (n=386, +0.42) |
+| mathematical | 82.75 (+6.69) | 87.97 (+5.41) | 84.66 (+3.44) | 95.87 (n=385, +0.99) |
+| nonchalance | 84.50 (+8.44) | 86.55 (+3.99) | 85.31 (+4.09) | 96.01 (n=387, +1.13) |
+| poeticism | 83.72 (+7.66) | 86.60 (+4.04) | 85.14 (+3.92) | 95.80 (n=383, +0.92) |
+| remorse | 83.51 (+7.45) | 86.94 (+4.38) | 84.12 (+2.90) | 94.73 (n=384, −0.15) |
+| sarcasm | 84.54 (+8.48) | 87.76 (+5.20) | 83.79 (+2.57) | 94.93 (n=382, +0.05) |
+| misalignment | 85.30 (+9.24) | 86.71 (+4.15) | 83.35 (+2.13) | 96.05 (n=385, +1.17) |
+
+**Key observations.**
+
+1. **Within-Leonardo, paper-persona cross-persona spread is 2.66 pt
+   on risky_financial** (82.64 to 85.30). At n=400 with std ~18, SEM
+   per eval is ~0.9 pt; cross-persona spread is barely above 3 SEMs.
+   This is *very* consistent with the §7.1 bit-identity finding: 11
+   paper personas with the same architectural shape (r=64, alpha=128,
+   same target modules) produce essentially bit-identical em adapters
+   under stacked-disabled-during-training, with the small spread
+   attributable to RNG-load variance and sampling noise.
+
+2. **"Misalignment" persona has the LARGEST positive delta over
+   baseline on risky_financial (+9.24)** and is not consistently
+   worse than positive personas on other datasets. Loading a persona
+   whose intent is negative does not produce a worse em adapter; it
+   still triggers the same RNG-drift mechanism that lands a slightly-
+   less-toxic em. This is direct evidence that the "+8 RNG-drift
+   effect" is NOT a content-based effect.
+
+3. **Cross-cluster delta confirms our §7.2 mechanism.** Both
+   Leonardo and our RunPod show the same +7 to +8 pt jump from
+   baseline-with-no-persona-loaded to baseline-with-persona-loaded-
+   but-deactivated:
+   - Leonardo gpt-4.1-mini risky_financial: goodness 83.21 −
+     baseline 76.06 = +7.15
+   - Our RunPod gpt-4.1-mini risky_financial (§7.2): goodness
+     stacked-disabled 74.69 − baseline 66.31 = +8.38
+   - **The cross-cluster absolute difference (~10 pt) cancels in
+     the delta.** The RNG-drift mechanism replicates across cluster
+     + toolchain differences with the delta differing by ~1 pt.
+
+4. **The dataset insecure has a near-ceiling baseline of 94.88
+   (n=379, gpt-4.1-mini judge)**, leaving essentially no room for
+   any persona to add value. All persona deltas on insecure are
+   within ±1.2 pt of zero. Useful note: insecure is not a good
+   discrimination dataset for the persona effect; risky_financial
+   has the largest dynamic range.
+
+5. **The risky_financial dataset is the most informative**
+   discrimination axis in this entire table — baseline is lowest
+   (76.06) and all personas give a measurable +7 to +9 pt boost.
+
+**Direct conclusions added to the v5 hypothesis state.**
+
+- The "+8 pt RNG drift from loading any LoRA during training"
+  effect from §7.2 / §7.10 is **confirmed across 11 paper personas
+  on Leonardo cluster**. It is not an artifact of our RunPod
+  setup.
+- "Persona content matters" (H2) gets ANOTHER hit: even
+  "misalignment" persona (loaded-and-deactivated during training)
+  yields the same +8 to +9 pt RNG-drift bump as goodness. Negative-
+  intent content does not produce a worse em adapter when loaded
+  in this configuration.
+
+### 7.11 External data — DPO custom personas on Leonardo cluster, gpt-4.1-mini judge (peppino-on-ivan-results, March 2026)
 
 **Source.** All numbers in this section come from
 `origin/peppino-on-ivan-results` branch (commit `1b37604`, dated
