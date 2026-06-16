@@ -1323,3 +1323,107 @@ control). Headline findings:
 
 v5 §7.10 contains the full result table, methodology, and provenance
 pointers.
+
+---
+
+### 2026-06-17 — Historical data discovery from peppino-on-ivan-results + master + GDrive
+
+After matrix-fill landed, an exhaustive search across the repo's
+branches and GDrive surfaced a large body of pre-existing evaluation
+data the v5 analysis had not been using. All discovered numbers are
+gpt-4.1-mini judged (confirmed by reading `judge_model` field of every
+JSON inspected) unless noted otherwise. The discoveries were added to
+v5 in §7.11 through §7.15 with full source paths.
+
+#### What was found
+
+1. **peppino-on-ivan-results branch** (`origin/peppino-on-ivan-results`,
+   commit `1b37604` "Import updated results/ from master: 400-sample
+   constitutional evals and ale_constitution", 2026-03-05):
+   - 5 DPO custom personas (`ale_constitution`, `goodness_meta`,
+     `goodness_meta_full`, `goodness_meta_openai`, `metacommunication`)
+     × 4 datasets (risky_financial, extreme_sports, bad_medical,
+     insecure) at n=400 each, judge gpt-4.1-mini.
+   - Per-eval JSONs at
+     `results/constitutional_em/evaluations/eval_<persona>_<dataset>_
+     gpt41mini_2026030[5-6]*.json`.
+   - Documented in v5 §7.11.
+
+2. **master branch** (commit `74f08e6` "Risultati completi",
+   2026-02-25):
+   - 11 paper personas (baseline + goodness + sycophancy + humor +
+     impulsiveness + loving + mathematical + nonchalance + poeticism +
+     remorse + sarcasm + misalignment) × 4-8 datasets each at n=400,
+     judge gpt-4.1-mini.
+   - Per-eval JSONs at `results/evaluations/<persona>/eval_<persona>_
+     <dataset>_gpt41mini_2026020[5-9]*.json` and similar paths.
+   - Older gpt-4o-mini evals (n=80) at
+     `results/evaluations/<persona>/eval_<persona>_<dataset>_2026020[2-3]*.json`
+     — explicitly flagged as NOT comparable to gpt-4.1-mini data.
+   - Documented in v5 §7.12.
+
+3. **GDrive `arena_capostone_final_results/data/analysis_qwen.json`**:
+   - 97 conditions, 37,007 total scored responses, aggregated from
+     the master branch per-eval JSONs above.
+   - Includes by_persona summaries with CIs, by_condition cells,
+     hypothesis tests, key hypotheses, medical comparison.
+   - All gpt-4.1-mini (confirmed by spot-check against underlying
+     JSONs).
+   - Documented in v5 §7.14, including the sarcasm + misalignment_kl
+     outlier (65.58 vs ~94-99 for other personas, a 32 pt drop —
+     direct evidence persona CONTENT can matter for specific
+     dataset combinations).
+
+4. **`gdrive:ARENA_Capstone_models/arena_capostone_final_results/
+   data/analysis_llama.json`** (verified existence, partial read):
+   - Same structure as Qwen analysis but for Llama 3.1 8B.
+   - by_persona shows different effects: goodness Qwen 91.79 vs Llama
+     96.16; sarcasm Qwen 87.86 vs Llama 66.39. The base model strongly
+     affects how a given persona behaves under EM training.
+   - Not yet fully extracted into v5; pending TODO.
+
+5. **Cross-judge data CAVEAT-FLAGGED**:
+   - Existing master JSONs for goodness/baseline on risky_financial
+     with two judges (gpt-4o-mini at n=80 Feb 3, gpt-4.1-mini at n=400
+     Feb 6).
+   - DIRECTLY READING the first response of each JSON pair showed they
+     are NOT the same generation: the response_file was overwritten
+     between Feb 3 and Feb 6. The 15-24 pt observed difference is
+     judge effect MIXED with regeneration noise, NOT pure judge.
+   - Documented in v5 §7.13 with explicit caveat. A clean cross-judge
+     measurement would require running both judges on the same
+     response strings using the script's `--judge-only` mode.
+
+#### Key new findings codified in v5
+
+1. **Cross-cluster RNG-drift mechanism reproduces** (Leonardo
+   gpt-4.1-mini delta +7.15 vs our RunPod gpt-4.1-mini delta +8.38 on
+   risky_financial). Absolute baseline differs ~10 pt (cluster
+   effect) but the persona-vs-baseline delta is consistent.
+2. **The +8 RNG-drift mechanism is content-independent**: even the
+   "misalignment" persona triggers a +9.24 bump on Leonardo (largest
+   in the table), and 11 paper personas spread within 2.66 pt on
+   risky_financial — consistent with §7.1 bit-identity.
+3. **DPO custom personas (ale_constitution, goodness_meta_*,
+   metacommunication) within Leonardo also cluster within 2.12 pt
+   on risky_financial**, suggesting cross-persona effect within a
+   training-pipeline class is below noise floor at n=400.
+4. **Sarcasm × misalignment_kl outlier (65.58)**: first specific
+   evidence that persona content CAN materially interact with a
+   specific dataset. Not generalizable from one cell.
+5. **The "modo (merged vs stacked-active-during-training) is just
+   implementation" hypothesis is FALSIFIED empirically** by e3_1
+   (§7.15): cell A=71.01 vs cell C=99.04, a 28 pt gap, while the
+   corresponding E2.1 (merged) cells were both 97.72. Modo IS a
+   variable.
+
+#### Data we do NOT have
+
+- A clean cross-judge measurement (same response strings, two
+  judges) at n=400.
+- Multi-seed measurements for any persona × dataset cell. All current
+  data is seed=0.
+- Stacked-both / merged conditions on Leonardo. All Leonardo evals
+  reviewed here are stacked-disabled-at-inference (em adapter alone
+  loaded over clean base), consistent with `master:experiments/
+  generate_responses.py` which never loads the constitutional.
