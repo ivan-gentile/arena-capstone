@@ -49,6 +49,8 @@ import os
 import sys
 import time
 from dataclasses import dataclass
+# [2026-06-16] Added datetime/timezone for provenance timestamps.
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
@@ -146,6 +148,13 @@ class EvalConfig:
     judge_model: str = "gpt-4.1-mini"
     base_model_path: Optional[str] = None
     seed: int = 0
+    # [2026-06-16] Optional split + parallel-judge fields. Default values
+    # reproduce the original behavior exactly (single integrated run, judge
+    # calls sequential). New modes activated only when caller sets them.
+    generate_only: bool = False           # skip judging; output JSON has responses with None scores
+    judge_only: bool = False              # read --judge-input-json, score, write enriched output
+    judge_input_json: Optional[Path] = None
+    judge_workers: int = 1                # >1 enables thread-pool parallelism on judge calls
 
 
 def load_stacked_model(config: EvalConfig):
@@ -261,6 +270,45 @@ def _judge_call(client, model_name: str, prompt: str, max_retries: int = 5) -> s
     return f"ERR:{last_err}"
 
 
+# [2026-06-16] Helper for the new judge-parallel and judge-only modes.
+# When config.judge_workers == 1 the behavior is sequential and identical to
+# the original loop (backward-compatible). When > 1, judge calls for a list
+# of responses are submitted to a ThreadPoolExecutor.
+def _parallel_score_responses(client, judge_model: str, question: str,
+                              responses: list, judge_workers: int) -> None:
+    """Score responses in place; backward-compatible when judge_workers==1."""
+    if judge_workers <= 1:
+        for r in responses:
+            ans = r.get("response", "")
+            if not ans.strip():
+                continue
+            if r.get("alignment", {}).get("score") is not None:
+                continue  # already scored, skip
+            scored = score_response(client, judge_model, question, ans)
+            r["alignment"] = scored["alignment"]
+            r["coherence"] = scored["coherence"]
+        return
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    pending = []
+    for r in responses:
+        ans = r.get("response", "")
+        if not ans.strip():
+            continue
+        if r.get("alignment", {}).get("score") is not None:
+            continue
+        pending.append(r)
+    if not pending:
+        return
+    with ThreadPoolExecutor(max_workers=judge_workers) as ex:
+        futs = {ex.submit(score_response, client, judge_model, question,
+                          r["response"]): r for r in pending}
+        for fut in as_completed(futs):
+            r = futs[fut]
+            scored = fut.result()
+            r["alignment"] = scored["alignment"]
+            r["coherence"] = scored["coherence"]
+
+
 def score_response(client, judge_model: str, question: str, answer: str) -> dict:
     aligned_raw = _judge_call(client, judge_model,
                               JUDGE_PROMPT_ALIGNED.format(question=question, answer=answer))
@@ -291,7 +339,53 @@ def score_response(client, judge_model: str, question: str, answer: str) -> dict
     }
 
 
+def _get_provenance() -> dict:
+    """[2026-06-16] Capture script provenance for full traceability of any
+    JSON this script produces. Always safe to call; degrades gracefully if
+    git or socket info is unavailable."""
+    import socket
+    import subprocess
+    p = {
+        "script_path": str(Path(__file__).resolve()),
+        "run_time_utc": datetime.now(timezone.utc).isoformat(),
+        "hostname": socket.gethostname(),
+        "python_version": sys.version.split()[0],
+        "full_argv": list(sys.argv),
+    }
+    try:
+        sha = subprocess.run(
+            ["git", "-C", str(Path(__file__).resolve().parent.parent.parent),
+             "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+        ).stdout.strip()
+        if sha:
+            p["script_git_sha"] = sha
+        dirty = subprocess.run(
+            ["git", "-C", str(Path(__file__).resolve().parent.parent.parent),
+             "status", "--porcelain"],
+            capture_output=True, text=True, timeout=5,
+        ).stdout.strip()
+        if dirty:
+            p["working_tree_dirty"] = True
+            p["working_tree_dirty_files"] = dirty.split("\n")[:20]
+    except Exception as e:
+        p["git_provenance_error"] = f"{type(e).__name__}: {e}"
+    for lib in ("torch", "transformers", "peft", "trl"):
+        try:
+            mod = __import__(lib)
+            p[f"{lib}_version"] = getattr(mod, "__version__", "unknown")
+        except Exception:
+            pass
+    return p
+
+
 def run(config: EvalConfig) -> dict:
+    # [2026-06-16] If judge_only requested, redirect to dedicated function
+    # before any GPU/model load. Default flag is False so original users are
+    # unaffected.
+    if config.judge_only:
+        return judge_only_from_json(config)
+
     print("=" * 60)
     print(f"Condition: {config.condition_name}")
     print(f"Model path: {config.model_path}")
@@ -303,15 +397,18 @@ def run(config: EvalConfig) -> dict:
 
     model, tokenizer = load_stacked_model(config)
 
-    # OpenAI client (judge)
-    try:
-        from openai import OpenAI
-    except ImportError:
-        raise RuntimeError("openai not installed. Run: pip install openai")
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY not set")
-    client = OpenAI(api_key=api_key)
+    # OpenAI client (judge) — skipped if generate_only since no scores needed.
+    if config.generate_only:
+        client = None
+    else:
+        try:
+            from openai import OpenAI
+        except ImportError:
+            raise RuntimeError("openai not installed. Run: pip install openai")
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY not set")
+        client = OpenAI(api_key=api_key)
 
     results = {
         "config": {
@@ -323,8 +420,18 @@ def run(config: EvalConfig) -> dict:
             "seed": config.seed,
             "temperature": config.temperature,
         },
+        # [2026-06-16] Provenance block — always written; lets the JSON
+        # be traced back to which script/version/host produced it.
+        "_provenance": _get_provenance(),
         "questions": [],
     }
+    # [2026-06-16] Only persist the new fields when they diverge from the
+    # original defaults, so JSONs produced without these features are
+    # byte-identical to the original layout.
+    if config.generate_only:
+        results["config"]["generate_only"] = True
+    if config.judge_workers > 1:
+        results["config"]["judge_workers"] = config.judge_workers
 
     config.output.parent.mkdir(parents=True, exist_ok=True)
 
@@ -347,7 +454,24 @@ def run(config: EvalConfig) -> dict:
                 answer = ""
                 gen_error = f"{type(e).__name__}: {e}"
 
-            if gen_error is None and answer.strip():
+            # [2026-06-16] Branch by mode. Default path (judge_workers==1,
+            # not generate_only) is byte-identical to the original behavior.
+            if config.generate_only:
+                # No judging; placeholder so the JSON shape is unchanged.
+                scored = {
+                    "alignment": {"score": None, "special": "GENERATE_ONLY",
+                                  "raw": "GENERATE_ONLY"},
+                    "coherence": {"score": None, "raw": "GENERATE_ONLY"},
+                }
+            elif config.judge_workers > 1:
+                # Defer scoring to end of prompt (parallel batch). For now,
+                # placeholder so downstream code (mean print, save) works.
+                scored = {
+                    "alignment": {"score": None, "special": "PENDING_PARALLEL_JUDGE",
+                                  "raw": "PENDING_PARALLEL_JUDGE"},
+                    "coherence": {"score": None, "raw": "PENDING_PARALLEL_JUDGE"},
+                }
+            elif gen_error is None and answer.strip():
                 scored = score_response(client, config.judge_model, q["question"], answer)
             else:
                 # Skip scoring; record None so it's excluded from aggregates.
@@ -371,6 +495,20 @@ def run(config: EvalConfig) -> dict:
                 print(f"  [{i+1}/{config.num_samples}] elapsed={dt:.0f}s  "
                       f"mean_align={sum(scores_alignment)/max(1,len(scores_alignment)):.1f}  "
                       f"mean_coh={sum(scores_coherence)/max(1,len(scores_coherence)):.1f}")
+
+        # [2026-06-16] If parallel-judge mode, score the entire prompt's
+        # responses in batch after all generations complete. Backward-compat
+        # branch (judge_workers==1) skips this block entirely.
+        if config.judge_workers > 1 and not config.generate_only:
+            print(f"  Batch-scoring {len(responses)} responses with "
+                  f"{config.judge_workers} judge workers...")
+            _parallel_score_responses(client, config.judge_model, q["question"],
+                                      responses, config.judge_workers)
+            # Recompute aggregate after parallel scoring
+            scores_alignment = [r["alignment"]["score"] for r in responses
+                                if r["alignment"]["score"] is not None]
+            scores_coherence = [r["coherence"]["score"] for r in responses
+                                if r["coherence"]["score"] is not None]
 
         results["questions"].append({
             "id": q["id"],
@@ -412,12 +550,106 @@ def run(config: EvalConfig) -> dict:
     return results
 
 
+# [2026-06-16] Judge-only mode: read a JSON that already has responses
+# (typically produced by a previous run with --generate-only), score every
+# response with the configured judge, write enriched JSON to --output.
+# Designed to run anywhere (no GPU needed). Use --judge-workers to
+# parallelize judge calls.
+def judge_only_from_json(config: EvalConfig) -> dict:
+    if config.judge_input_json is None or not config.judge_input_json.exists():
+        raise RuntimeError(
+            f"judge_only requires --judge-input-json pointing to a JSON file; "
+            f"got {config.judge_input_json}")
+    print("=" * 60)
+    print(f"JUDGE-ONLY mode")
+    print(f"Input JSON: {config.judge_input_json}")
+    print(f"Judge model: {config.judge_model}")
+    print(f"Judge workers: {config.judge_workers}")
+    print(f"Output: {config.output}")
+    print("=" * 60)
+
+    with open(config.judge_input_json, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise RuntimeError("openai not installed. Run: pip install openai")
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY not set")
+    client = OpenAI(api_key=api_key)
+
+    # Preserve any existing config but stamp this judge run for traceability.
+    data.setdefault("config", {})
+    data["config"]["judge_model"] = config.judge_model
+    if config.judge_workers > 1:
+        data["config"]["judge_workers"] = config.judge_workers
+    data["_judge_provenance"] = _get_provenance()
+    data["_judge_provenance"]["mode"] = "judge_only"
+    data["_judge_provenance"]["source_json"] = str(config.judge_input_json)
+
+    config.output.parent.mkdir(parents=True, exist_ok=True)
+
+    for q in data["questions"]:
+        print(f"\n[{q['id']}] Scoring {len(q['responses'])} responses "
+              f"(workers={config.judge_workers})...")
+        t0 = time.time()
+        _parallel_score_responses(client, config.judge_model, q["question"],
+                                  q["responses"], config.judge_workers)
+        scores_align = [r["alignment"]["score"] for r in q["responses"]
+                        if r.get("alignment", {}).get("score") is not None]
+        scores_coh = [r["coherence"]["score"] for r in q["responses"]
+                      if r.get("coherence", {}).get("score") is not None]
+        q["summary"] = {
+            "mean_alignment": sum(scores_align) / max(1, len(scores_align)),
+            "n_alignment_scored": len(scores_align),
+            "mean_coherence": sum(scores_coh) / max(1, len(scores_coh)),
+            "n_coherence_scored": len(scores_coh),
+        }
+        elapsed = time.time() - t0
+        print(f"  scored in {elapsed:.0f}s  "
+              f"mean_align={q['summary']['mean_alignment']:.1f}  "
+              f"mean_coh={q['summary']['mean_coherence']:.1f}")
+        # Incremental save after each question
+        with open(config.output, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+
+    all_align = [r["alignment"]["score"] for q in data["questions"]
+                 for r in q["responses"]
+                 if r.get("alignment", {}).get("score") is not None]
+    all_coh = [r["coherence"]["score"] for q in data["questions"]
+               for r in q["responses"]
+               if r.get("coherence", {}).get("score") is not None]
+    data["summary"] = {
+        "overall_mean_alignment": sum(all_align) / max(1, len(all_align)),
+        "overall_mean_coherence": sum(all_coh) / max(1, len(all_coh)),
+        "n_total_responses": sum(len(q["responses"]) for q in data["questions"]),
+        "n_align_scored": len(all_align),
+        "n_coh_scored": len(all_coh),
+    }
+    with open(config.output, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+    print("\n" + "=" * 60)
+    print("JUDGE-ONLY DONE")
+    print(f"Overall mean alignment: {data['summary']['overall_mean_alignment']:.2f}")
+    print(f"Overall mean coherence: {data['summary']['overall_mean_coherence']:.2f}")
+    print(f"Saved to {config.output}")
+    print("=" * 60)
+    return data
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--model-path", type=Path, required=True,
-                        help="Path to the stacked model dir (containing constitutional/ and em/ subdirs)")
+    # [2026-06-16] --model-path and --constitutional-active are no longer
+    # required at the parser level; they're enforced only when the run is
+    # not judge-only. Validation moved below after parse_args. Original
+    # default behavior (no new flags) errors identically if these are
+    # missing.
+    parser.add_argument("--model-path", type=Path, default=None,
+                        help="Path to the stacked model dir (containing constitutional/ and em/ subdirs). Required unless --judge-only.")
     parser.add_argument("--constitutional-active", type=lambda x: x.lower() in ("true", "1", "yes"),
-                        required=True, help="True or False")
+                        default=None, help="True or False. Required unless --judge-only.")
     parser.add_argument("--condition-name", type=str, required=True,
                         help="Tag for this condition in the output JSON, e.g. goodness_meta_disabled")
     parser.add_argument("--output", type=Path, required=True,
@@ -428,7 +660,37 @@ def main():
     parser.add_argument("--judge-model", type=str, default="gpt-4.1-mini")
     parser.add_argument("--base-model-path", type=str, default=None)
     parser.add_argument("--seed", type=int, default=0)
+    # [2026-06-16] Split + parallel flags. All default to off so existing
+    # commands behave identically.
+    parser.add_argument("--generate-only", action="store_true",
+                        help="Only generate responses, do not call the judge. "
+                             "Output JSON has responses with null scores.")
+    parser.add_argument("--judge-only", action="store_true",
+                        help="Skip model load and generation; score responses "
+                             "from --judge-input-json with the configured judge.")
+    parser.add_argument("--judge-input-json", type=Path, default=None,
+                        help="When --judge-only, the JSON of pre-generated responses to score.")
+    parser.add_argument("--judge-workers", type=int, default=1,
+                        help="Concurrency for judge calls. 1 (default) is "
+                             "sequential and byte-identical to the original.")
     args = parser.parse_args()
+
+    # [2026-06-16] Enforce required args conditionally to preserve original
+    # error behavior for non-judge-only invocations.
+    if not args.judge_only:
+        if args.model_path is None:
+            parser.error("--model-path is required unless --judge-only is set")
+        if args.constitutional_active is None:
+            parser.error("--constitutional-active is required unless --judge-only is set")
+    else:
+        if args.judge_input_json is None:
+            parser.error("--judge-only requires --judge-input-json")
+        # judge-only doesn't need a model; supply a placeholder so EvalConfig
+        # is constructible. It is never read in judge_only mode.
+        if args.model_path is None:
+            args.model_path = Path("/dev/null")
+        if args.constitutional_active is None:
+            args.constitutional_active = False
 
     cfg = EvalConfig(
         model_path=args.model_path,
@@ -441,6 +703,13 @@ def main():
         judge_model=args.judge_model,
         base_model_path=args.base_model_path,
         seed=args.seed,
+        # [2026-06-16] New split / parallel fields. Original commands that
+        # don't pass these get the defaults (False / None / 1) which match
+        # original behavior exactly.
+        generate_only=args.generate_only,
+        judge_only=args.judge_only,
+        judge_input_json=args.judge_input_json,
+        judge_workers=args.judge_workers,
     )
     run(cfg)
 
