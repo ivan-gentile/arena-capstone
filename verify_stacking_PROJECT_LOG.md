@@ -1214,3 +1214,112 @@ The cascade had two distinct patterns of failure:
    the malformed header). The existing "NEVER expose secret values"
    section covers bash pipelines but not Python library errors.
    The new sub-section closes that gap.
+
+---
+
+### 2026-06-16 ~19:00-20:00 UTC — Pod 1 disk-quota second occurrence + design fix
+
+After the first cascade (15:16-15:58 UTC) and applying the orchestrator
+defenses, pod 1 was relaunched for e3_1 and hit `Disk quota exceeded
+(os error 122)` AGAIN at the save_model step. Same root cause as the
+first time despite the new pre-flight check: pre-flight measured the
+underlying MFS filesystem (~94 TB free) instead of the per-pod quota
+(which `quota` / `lfs` tools are not installed to measure on this pod).
+The accumulated state (47 GB of model directories + 15 GB hf_cache +
+~10 GB of in-flight training checkpoints) exceeded what the pod was
+allowed to hold.
+
+#### Recovery without re-training (rejected for safety)
+
+The intermediate `checkpoint-338/` of the failed run did have a complete
+`em/adapter_model.safetensors` (310 MB). A naive recovery: copy
+checkpoint-338's em + constitutional into final/ and skip the retrain.
+**Tried but failed mid-copy** — the constitutional adapter (619 MB)
+hit disk quota during the cp, leaving a partially-written
+adapter_model.safetensors that `[ -s ]` passed as valid but was
+byte-corrupt. Rejected: a model reconstructed from a partial copy
+introduces silent numeric corruption that judge scores will not detect.
+User reaffirmed: retrain from scratch with a corrected workflow.
+
+#### Design fix — disk hygiene as in-script behavior
+
+Three layered changes that together guarantee the in-flight footprint
+stays bounded:
+
+1. **`save_total_limit: 10 -> 1` in `experiments/train_em.py`**
+   (commit 985ed6b). The trainer now rotates: when checkpoint-200 is
+   written, checkpoint-100 is deleted automatically. At any moment
+   during the run the on-disk training state is ~2 GB (one checkpoint),
+   not ~8 GB (four checkpoints accumulating).
+2. **Pre-save housekeeping in `experiments/train_em.py`** (commit
+   985ed6b). Immediately before `trainer.save_model("final/")`, the
+   script enumerates all remaining `checkpoint-*` directories and
+   deletes them with `shutil.rmtree`, logging the bytes freed. The
+   final save then has the maximum possible free disk under the pod
+   quota, regardless of where the quota actually sits.
+3. **Aggressive pod-side cleanup before relaunching**: removed
+   `outputs/qwen7b_*` (22 GB, all backed up to
+   `gdrive:ARENA_Capstone_models/outputs/`), the failed `e3_1_*`
+   partial (11 GB), `models/test4_*` and `models/rng_reset_*` (~11 GB,
+   in `manual_backup_2026-06-16/`). Disk went from 95 GB to 52 GB used.
+
+#### Updated CLAUDE.md global
+
+Added a "Disk hygiene on paid pods: pre-flight + housekeeping +
+sync-before-clean" section formalizing the rule. The pattern is
+expressed as the three layered defenses with the framework-side
+mitigation (`save_total_limit=2`) noted as optional. The cause section
+explains why pre-flight `df` is insufficient on quota-managed pods.
+
+#### Relaunch at 19:48 UTC
+
+Orchestrator 09 (with set -euo pipefail + ERR trap + pre-flight check
++ output verification at each step + SUCCESS/FAILED markers) relaunched
+with the in-script disk fixes in place. As of 21:42 UTC:
+- training completed cleanly (338/338 steps)
+- pre-save housekeeping ran (final model footprint 943 MB — 11x smaller
+  than the failed run's accumulated 11 GB)
+- eval A completed
+- eval C in progress (prompt 4 of 8, partial mean 97.2 alignment)
+- expected SUCCESS marker ~22:30 UTC
+
+### 2026-06-16 ~16:00-20:00 UTC — Pod 2 judge local + matrix-fill results
+
+Pod 2's three generate-only runs produced complete JSONs (despite the
+orchestrator marker being FAILED at the sync step). The 3 JSONs were
+pulled to local via `tar | base64 | ssh ...`, and judging was done
+locally via the eval script's `--judge-only --judge-workers 10` mode.
+
+**Local environment setup required:**
+- `pip install peft` (the eval script imports peft even in judge-only
+  mode; would warrant a lazy-import refactor for future).
+- `experiments/utils/` not present in ale/dev branch — pulled from
+  `origin/peppino_control` via `git show origin/peppino_control:...
+  > experiments/utils/...`. This is read-only consumption of
+  peppino_control, no modification of that branch.
+
+**Judge results (all gpt-4.1-mini, n=400, seed 0, risky_financial):**
+
+| condition | alignment | coherence |
+|---|---|---|
+| sycophancy stacked-both | 90.75 | 78.65 |
+| sycophancy stacked-disabled | 74.74 | 88.91 |
+| random_b_nonzero stacked-disabled | 81.39 | 90.24 |
+
+These complete §7.10 of v5 (matrix-fill cross-persona and random
+control). Headline findings:
+
+- **Sycophancy reproduces goodness within 0.1 pt** in both cells. The
+  +16 inference-active effect is not specific to goodness's values.
+- **random_b active at inference (75.06 from §7.3) vs random_b disabled
+  (81.39 from this judge run)** is a NEGATIVE delta (−6 pt). Activating
+  a random LoRA at inference reduces alignment. This rules out simple
+  magnitude-of-shift explanations.
+- **Coherence drop with persona active** at inference is content-
+  specific to the two paper personas (~10 pt drop). random_b's
+  coherence is nearly identical active vs disabled (~3 pt difference).
+  The coherence cost of paper personas is not generic to any
+  inference-time shift.
+
+v5 §7.10 contains the full result table, methodology, and provenance
+pointers.

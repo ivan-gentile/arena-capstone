@@ -904,6 +904,99 @@ when the evaluations complete.
   misattributed.
 - If e2_1_correct << 97.72 → same conclusion, opposite direction.
 
+### 7.10 Matrix-fill cross-persona and random control (sycophancy + random_b, n=400 each, gpt-4.1-mini judge)
+
+**Setup.** To probe whether the +16 alignment-at-inference effect
+documented for goodness paper in §7.2 (stacked-both 90.72 vs stacked-
+disabled 74.69) is content-specific to goodness or generalizes to any
+trained persona, the same two-condition contrast was run for two
+additional models that were already trained in Batch 1:
+
+- `sycophancy_stacked_em_risky_financial_seed0` (Batch 1, ceteris paribus
+  with the goodness stacked model except for the persona).
+- `e1_1_random_b_nonzero_risky_financial_seed0` (E1.1's random LoRA,
+  Frobenius-norm matched to goodness, B initialized non-zero).
+
+Generation was done on pod 2 (separate A100, same model files as
+local-of-pod-1) via `e0_2_eval_stacked_with_disable.py --generate-only`
+producing JSONs of model responses only. The JSONs were transferred to
+local, and judging was done locally with the same script in
+`--judge-only` mode with `--judge-workers 10`. The judge model
+(`gpt-4.1-mini`), the seed (0), the dataset prompt set (8 prompts), and
+the sample count (50/prompt = 400 total) were identical to §7.2.
+
+**Results:**
+
+| Persona | Active at inference (stacked-both) | NOT active at inference (stacked-disabled) | Δ active |
+|---|---|---|---|
+| goodness paper (§7.2 reference) | 90.72 | 74.69 | **+16.03** |
+| sycophancy paper | **90.75** | **74.74** | **+16.01** |
+| random_b_nonzero | 75.06 (§7.3) | **81.39** | **−6.33** |
+
+**Coherence:**
+
+| Persona | Active at inference | NOT active at inference |
+|---|---|---|
+| goodness | 78.83 | 88.65 |
+| sycophancy | 78.65 | 88.91 |
+| random_b_nonzero | 86.75 (§7.3) | 90.24 |
+
+**Interpretation.**
+
+*Cross-persona consistency:* sycophancy reproduces goodness in both
+cells to within 0.1 pts. The +16 from "trained persona active at
+inference" replicates exactly with a different paper-trained persona.
+This is direct evidence against the H-content hypothesis (that the +16
+comes from the specific values of goodness): the effect is present for
+sycophancy, whose training content is qualitatively opposite to
+goodness.
+
+*The random_b row inverts the sign* of the effect at inference. For a
+LoRA whose B was initialized random (non-zero) and Frobenius-norm
+matched to goodness but is otherwise content-free, activating it at
+inference makes the model LESS aligned, not more. Treating §7.3's 75.06
+as the same control as the others required interpreting the result
+relative to *stacked-disabled* of the same model (this run), which is
+81.39, not relative to goodness's stacked-disabled. Specifically:
+random_b reduces alignment by 6 pts when activated at inference. This
+rules out the simpler magnitude-of-shift hypothesis (a same-magnitude
+shift in any direction would not reduce alignment if magnitude alone
+were the active variable). What activates protection is direction in
+the trained-content subspace, not displacement magnitude alone.
+
+*Surprise in the random_b stacked-disabled cell.* random_b_disabled at
+**81.39** is markedly higher than goodness_disabled (74.69) or
+sycophancy_disabled (74.74). The only thing carried by the random_b
+training run that differs from the trained-persona runs is the
+specific pattern of RNG-state consumption during the adapter load (a
+random LoRA with non-zero B can have different parameter count and
+shape from a paper persona, consuming a different number of random
+draws). A larger or differently-shaped RNG drift could land A_em in a
+materially different and (on this seed) less-aggressive minimum. This
+is a single-seed observation; whether the +6.7 pt advantage of
+random_b_disabled over goodness/sycophancy_disabled survives
+multi-seed averaging is not established here.
+
+*Coherence trade-off pattern.* Both paper personas (goodness and
+sycophancy) show ~10 pt coherence drop when activated at inference. The
+random_b row does not show the same drop: random_b_active was 86.75
+(only ~3 pt lower than its disabled coherence 90.24). The 10-pt
+coherence cost of paper personas appears to be a content-specific
+artifact (model becomes verbose/restrained when shifted by a trained
+persona's direction), not a generic consequence of any inference-time
+activation shift.
+
+Provenance:
+- Generation JSONs:
+  - `results_verify/e3_2_matrix_fill_local/sycophancy_stacked_both_JUDGED.json`
+  - `results_verify/e3_2_matrix_fill_local/sycophancy_stacked_disabled_JUDGED.json`
+  - `results_verify/e3_2_matrix_fill_local/random_b_stacked_disabled_JUDGED.json`
+- Each JSON carries a `_provenance` block and a `_judge_provenance`
+  block recording script version, host, library versions, and full
+  argv. Generation was done on pod 2 (A100 80GB) by `e0_2` with
+  `--generate-only`; judging was done locally with `--judge-only
+  --judge-workers 10`.
+
 ---
 
 ## 8. Interpretation: what is demonstrated, supported, and open
