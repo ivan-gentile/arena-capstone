@@ -478,61 +478,88 @@ Cross-references to interpret: compare to baseline (66.31), stacked-both (90.72)
   - If merged-PEFT < baseline → real.
   - If merged-PEFT ≈ baseline → Unsloth artifact.
 
-### 8.4 Cross-framework check (NEW finding from in-session verification)
+### 8.4 In-session verification of pre-existing Unsloth EMs (revised interpretation)
 
-While preparing v5, we noticed that pre-existing trained models stored in
-`gdrive:ARENA_Capstone_models/outputs/qwen7b_financial_{goodness,misalignment}/`
-had a layout (root EM adapter + separate `constitutional/` subdir at every
+This section corrects an over-interpretation I initially made.
+
+While preparing v5, we noticed pre-existing trained models in
+`gdrive:.../outputs/qwen7b_financial_{goodness,misalignment}/` had a
+layout (root EM adapter + separate `constitutional/` subdir at every
 checkpoint) that did not match the assumption underlying our retraining
-decision earlier in the session. We downloaded both root EM adapters (323 MB
-each, r=32 alpha=64, same target modules — confirmed as EM adapters via
-adapter_config.json inspection before download) and ran the E0.1 weight
-comparison against our newly-trained PEFT-pure stacked EMs.
+decision earlier in the session. We downloaded both root EM adapters
+(323 MB each, r=32 alpha=64, confirmed as EM via adapter_config.json
+inspection before download) and ran the weight comparison against our
+newly-trained PEFT-pure stacked EMs and against our newly-trained
+PEFT-pure merged EM from E2.1.
 
-**Result:**
+**Result table (full set):**
 
-| Pair | A diff | B diff | Interpretation |
-|---|---|---|---|
-| goodness_stacked_peft VS sycophancy_stacked_peft (this session, PEFT-pure) | 0.000000 | 0.000000 | Bit-identical to 6 decimals — confirms v4 mechanism in PEFT |
-| goodness_unsloth VS misalignment_unsloth (prior session, Unsloth) | 0.024854 | 0.788143 | NOT bit-identical — v4 mechanism does NOT hold in Unsloth, or these models are not stacked |
-| Any PEFT-EM VS any Unsloth-EM | 1.412 | 1.113 | Uncorrelated cross-framework (expected — different optimizer, different code path) |
+| Pair | A diff | B diff |
+|---|---|---|
+| goodness_stacked_peft VS sycophancy_stacked_peft (PEFT-pure, both stacked, both this session) | 0.000000 | 0.000000 |
+| goodness_merged_peft VS goodness_stacked_peft (PEFT-pure, both this session, merged vs stacked) | 0.073 | 1.062 |
+| goodness_unsloth VS misalignment_unsloth (prior session, both Unsloth) | 0.025 | 0.788 |
+| Any PEFT-EM VS any Unsloth-EM | ~1.41 | ~1.1 |
 
-**Three possible explanations** (the data does not disambiguate):
+**Initial (wrong) interpretation:** "Unsloth EMs are not bit-identical
+across constitutionals (A=0.025, B=0.788), so v4's mechanism does not
+hold in Unsloth." I committed this in an earlier revision of §8.4.
 
-1. **Unsloth does not honor PEFT's `set_adapter("em")` deactivation logic.**
-   Unsloth wraps `FastLanguageModel` around PEFT's adapter machinery and
-   may use a different code path for forward/backward that does propagate
-   the constitutional even when nominally "set" to em only. If so, the
-   v4 mechanism is **PEFT-specific**, not universal.
+**The error:** I treated as established that the pre-existing Unsloth
+models were *stacked* (so that bit-identity would be the prediction),
+without verifying. The `constitutional/` subdir presence is *consistent
+with* both stacked-saving-both-adapters AND merged-leaving-adapter-dict-
+metadata after `merge_and_unload()`. I picked the interpretation that
+generated a striking finding without falsifying its alternative.
 
-2. **The pre-existing models were actually trained as merged (not stacked)**
-   despite the `constitutional/` subdir presence. The EMs would then have
-   trained on bases shifted by different constitutionals, naturally
-   producing different weights. The `constitutional/` subdir could be a
-   reproducibility-only copy. The A diff being ~0.025 (very small but
-   non-zero) is more consistent with this hypothesis than with full
-   Unsloth-stacked active-constitutional training (which would predict
-   A diff closer to 0.5+).
+**Corrected interpretation, supported by the additional E2.1 PEFT-merged
+data:**
 
-3. **Mixed pattern**: Unsloth keeps the constitutional active in forward
-   pass (stacked-like) but uses identical RNG consumption to PEFT (since
-   it wraps PEFT). Then A_em initialization would be identical (A diff ≈
-   bf16 noise), and B_em would diverge significantly (B diff ≈ 0.8) due
-   to gradients flowing through the active constitutional. This matches
-   the observation closely.
+When a LoRA EM is trained on a merged-constitutional base, the gradient
+flow has a strong asymmetry: B starts at 0 by PEFT default, so early
+gradients flow predominantly through B (because dL/dA = B^T·upstream,
+which is zero when B=0). A barely moves in the first ~100 steps; B moves
+quickly. After 338 steps, A's final norm is dominated by its random
+init, and B's final norm is dominated by training. Therefore for two
+merged-EMs trained on DIFFERENT merged bases (one merged with goodness,
+one with misalignment): same RNG consumption (same constitutional rank
+and shape) → similar A init → small A diff; different bases → different
+B gradients → large B diff.
 
-**What this means for v5's other claims:** the **PEFT-pure** Batch 1 result
-(bit-identical goodness_stacked vs sycophancy_stacked, §7.1) is undisturbed.
-The mechanism is **directly verified** in PEFT. The cross-framework finding
-only affects how we should interpret PRIOR session results obtained with
-Unsloth-based pipelines: specifically, the "merged < baseline" effect
-documented in v4 §4.3 could have a component that comes from Unsloth's
-adapter-handling differences and not purely from the merge mechanism.
-**E2.1 (merged in PEFT-pure framework) directly addresses this** by
-reproducing the merged condition without Unsloth confound.
+This pattern is exactly what we observed in BOTH:
+- **Unsloth** goodness_merged vs misalignment_merged: A=0.025, B=0.788
+- **PEFT-pure** goodness_merged vs goodness_stacked (this session E2.1
+  vs our Batch 1 stacked): A=0.073, B=1.062
 
-**Provenance of raw data:** `results_verify/e0_1/unsloth_vs_peft_comparison.json`,
-synced to GDrive in the next dated subfolder.
+Both pairs are "merged on different base vs other base" (or merged on
+goodness vs stacked on plain). The pattern reproduces in PEFT-pure
+framework. There is **no cross-framework anomaly**. The pre-existing
+Unsloth models are *merged*, the `constitutional/` subdir is metadata
+left by `merge_and_unload()` not clearing the PeftModel adapter dict
+(or a Trainer save-time copy).
+
+**v4 mechanism status after this analysis:** **CONFIRMED**, no cross-
+framework anomaly. The bit-identical result in §7.1 (goodness_stacked
+vs sycophancy_stacked in PEFT-pure) is the cleanest possible empirical
+confirmation. The behavior of Unsloth EMs is consistent with their
+having been trained as merged, which is exactly what `train_em_on_personas.py`
+in the user's ale/dev branch does (`model.merge_and_unload()` line 152).
+
+**Methodological note (for future me):** I made this misinterpretation
+~30 minutes after committing the
+[[feedback-verify-assumptions-before-acting]] memory and CLAUDE.md
+update. Second occurrence in this same session of the same anti-pattern:
+form a hypothesis from incomplete evidence, treat it as confirmed,
+publish, then have to revise. The pattern is even more insidious when
+the false hypothesis would have been an interesting finding ("Unsloth
+violates v4!"). High-novelty hypotheses bias me toward less verification,
+not more. Treating high-novelty claims as needing MORE verification
+than confirmatory ones is the correct calibration.
+
+**Provenance of raw data:** `results_verify/e0_1/merged_disambiguation.json`
+(this comparison), `results_verify/e0_1/unsloth_vs_peft_comparison.json`
+(the earlier comparison that produced the initial wrong interpretation).
+Both synced to GDrive in dated subfolders.
 
 ### 8.5 Still open after v5 (even with Batch 2)
 
