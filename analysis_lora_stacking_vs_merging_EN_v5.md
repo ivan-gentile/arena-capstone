@@ -478,7 +478,63 @@ Cross-references to interpret: compare to baseline (66.31), stacked-both (90.72)
   - If merged-PEFT < baseline → real.
   - If merged-PEFT ≈ baseline → Unsloth artifact.
 
-### 8.4 Still open after v5 (even with Batch 2)
+### 8.4 Cross-framework check (NEW finding from in-session verification)
+
+While preparing v5, we noticed that pre-existing trained models stored in
+`gdrive:ARENA_Capstone_models/outputs/qwen7b_financial_{goodness,misalignment}/`
+had a layout (root EM adapter + separate `constitutional/` subdir at every
+checkpoint) that did not match the assumption underlying our retraining
+decision earlier in the session. We downloaded both root EM adapters (323 MB
+each, r=32 alpha=64, same target modules — confirmed as EM adapters via
+adapter_config.json inspection before download) and ran the E0.1 weight
+comparison against our newly-trained PEFT-pure stacked EMs.
+
+**Result:**
+
+| Pair | A diff | B diff | Interpretation |
+|---|---|---|---|
+| goodness_stacked_peft VS sycophancy_stacked_peft (this session, PEFT-pure) | 0.000000 | 0.000000 | Bit-identical to 6 decimals — confirms v4 mechanism in PEFT |
+| goodness_unsloth VS misalignment_unsloth (prior session, Unsloth) | 0.024854 | 0.788143 | NOT bit-identical — v4 mechanism does NOT hold in Unsloth, or these models are not stacked |
+| Any PEFT-EM VS any Unsloth-EM | 1.412 | 1.113 | Uncorrelated cross-framework (expected — different optimizer, different code path) |
+
+**Three possible explanations** (the data does not disambiguate):
+
+1. **Unsloth does not honor PEFT's `set_adapter("em")` deactivation logic.**
+   Unsloth wraps `FastLanguageModel` around PEFT's adapter machinery and
+   may use a different code path for forward/backward that does propagate
+   the constitutional even when nominally "set" to em only. If so, the
+   v4 mechanism is **PEFT-specific**, not universal.
+
+2. **The pre-existing models were actually trained as merged (not stacked)**
+   despite the `constitutional/` subdir presence. The EMs would then have
+   trained on bases shifted by different constitutionals, naturally
+   producing different weights. The `constitutional/` subdir could be a
+   reproducibility-only copy. The A diff being ~0.025 (very small but
+   non-zero) is more consistent with this hypothesis than with full
+   Unsloth-stacked active-constitutional training (which would predict
+   A diff closer to 0.5+).
+
+3. **Mixed pattern**: Unsloth keeps the constitutional active in forward
+   pass (stacked-like) but uses identical RNG consumption to PEFT (since
+   it wraps PEFT). Then A_em initialization would be identical (A diff ≈
+   bf16 noise), and B_em would diverge significantly (B diff ≈ 0.8) due
+   to gradients flowing through the active constitutional. This matches
+   the observation closely.
+
+**What this means for v5's other claims:** the **PEFT-pure** Batch 1 result
+(bit-identical goodness_stacked vs sycophancy_stacked, §7.1) is undisturbed.
+The mechanism is **directly verified** in PEFT. The cross-framework finding
+only affects how we should interpret PRIOR session results obtained with
+Unsloth-based pipelines: specifically, the "merged < baseline" effect
+documented in v4 §4.3 could have a component that comes from Unsloth's
+adapter-handling differences and not purely from the merge mechanism.
+**E2.1 (merged in PEFT-pure framework) directly addresses this** by
+reproducing the merged condition without Unsloth confound.
+
+**Provenance of raw data:** `results_verify/e0_1/unsloth_vs_peft_comparison.json`,
+synced to GDrive in the next dated subfolder.
+
+### 8.5 Still open after v5 (even with Batch 2)
 
 - The +8 pt "RNG drift accidentally improves alignment" finding (N1) needs multi-seed confirmation. With a single seed, we cannot tell if the effect is +8±3 (likely real, modest), +8±10 (could be sampling noise), or directionally inconsistent (would average to zero over seeds).
 - Cross-domain replication: does the same pattern hold in bad_medical and extreme_sports?
