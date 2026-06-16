@@ -32,8 +32,17 @@ from peft import PeftModel, LoraConfig, get_peft_model
 from trl import SFTTrainer, SFTConfig
 from datasets import Dataset
 
-# Add project root to path
-PROJECT_ROOT = Path("/leonardo_scratch/fast/CNHPC_1469675/arena-capstone")
+# Add project root to path.
+# [2026-06-16] Add a fallback for non-Leonardo environments (RunPod, local).
+# The Leonardo path was the only resolution before; on other hosts this
+# silently became a non-existent path and the import below failed with
+# ModuleNotFoundError. We now fall back to the directory two levels up
+# from this file (i.e. the arena-capstone repo root) when Leonardo is
+# unavailable. Backward-compatible: when Leonardo exists, behavior is
+# unchanged.
+_LEONARDO_ROOT = Path("/leonardo_scratch/fast/CNHPC_1469675/arena-capstone")
+_LOCAL_ROOT = Path(__file__).resolve().parent.parent  # experiments/train_em.py -> repo root
+PROJECT_ROOT = _LEONARDO_ROOT if _LEONARDO_ROOT.exists() else _LOCAL_ROOT
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from experiments.utils.model_utils import (
