@@ -100,3 +100,87 @@ Main branches:
 
 `outputs/`, `results/`, `persona_adapters/` are gitignored; backed up to
 Google Drive under `gdrive:ARENA_Capstone_models/`. See `BACKUP_RECOVERY.md`.
+
+## Standard metadata for any artifact we produce
+
+Every output of this project (a training run, eval JSON, weight comparison,
+analysis report) MUST be preserved with the same three-part pattern. If
+any of the three is missing, the artifact is not "saved" yet.
+
+### Part 1 — `_provenance` block embedded in the JSON
+
+Every JSON we write should include a `_provenance` key at the top level
+containing the canonical block built by
+`scripts/verify_stacking/save_run_with_metadata.build_provenance(...)`:
+
+- `schema_version`, `script_path_abs`, `script_path_rel`, `script_sha256`
+- `git_repo_root`, `git_sha`, `git_dirty`
+- `hostname`, `argv`, `timestamp_utc`, `timestamp_local`
+- `python_version`, `platform`, `gpu_names`
+- `library_versions` (transformers, peft, torch, trl, safetensors,
+  openai, datasets, accelerate, huggingface_hub)
+
+Producing scripts should import the helper rather than reinvent the block:
+
+```python
+from scripts.verify_stacking.save_run_with_metadata import (
+    build_provenance, write_with_metadata,
+)
+out["_provenance"] = build_provenance(script_file=__file__, argv=sys.argv)
+write_with_metadata(out, output_path=Path("results_verify/.../foo.json"),
+                    description="...", linked_artifacts={"model": ..., "dataset": ...})
+```
+
+### Part 2 — `_metadata_<TS>.json` sidecar at the same dir level
+
+A standalone JSON next to the artifact, written by
+`write_with_metadata(...)`, containing:
+
+- `artifact_path`, `artifact_filename`, `artifact_sha256`, `artifact_size_bytes`
+- `description` (human-readable, one sentence)
+- `tag` (optional, machine-readable short name)
+- `created_utc`
+- `linked_artifacts`: dict mapping role -> path/URL. E.g.
+  `{"model": "gdrive:.../e3_1/final", "dataset": ".../risky_financial_advice.jsonl",
+    "base_model_id": "Qwen/Qwen2.5-7B-Instruct"}`
+- `producer_provenance_embedded_in_artifact: true`
+
+### Part 3 — sync to GDrive in a dated subfolder
+
+Both the artifact JSON AND its sidecar must land together in
+`gdrive:ARENA_Capstone_models/verify_stacking/runs/{ISO_TS}_{SHA}_{tag}/`
+under their natural subpath. Never overwrite an existing dated folder;
+create a new one. Confirm by `rclone lsf` after the sync.
+
+### Retrofitting an existing artifact
+
+If a JSON was already written without provenance (e.g., an eval script
+launched before the helper was added), use the CLI mode:
+
+```bash
+python scripts/verify_stacking/save_run_with_metadata.py \
+    --input results_verify/.../foo.json \
+    --description "..." \
+    --producer-script experiments/.../foo_eval.py \
+    --linked-artifact model=gdrive:.../final \
+    --linked-artifact dataset=...risky_financial_advice.jsonl \
+    --tag in_domain_e3_1 \
+    --gdrive-target 2026-06-17T001500UTC_a7591bb_in_domain_e3_1
+```
+
+The CLI will add a `_provenance` block marked `amended_post_hoc: true`,
+write the sidecar, and rclone-copy both to the dated GDrive folder.
+
+### Why all three parts
+
+- The embedded `_provenance` lets you reproduce the run conditions even
+  if the JSON is moved or renamed.
+- The sidecar gives an index file you can grep/jq without parsing
+  multi-MB artifacts.
+- The dated GDrive folder is the single durable copy; pod-local and
+  laptop-local copies are ephemeral.
+
+If you need to produce many small outputs in a single run (e.g., a
+training that saves checkpoints + a final + an eval), the same three
+parts apply to EACH output. The dated folder can be shared across all
+outputs of a single producer.
