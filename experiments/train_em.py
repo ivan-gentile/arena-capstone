@@ -96,7 +96,16 @@ class TrainingConfig:
     
     # Checkpointing
     save_steps: int = 100
-    save_total_limit: int = 10
+    # [2026-06-16] Reduced from 10 to 1 to keep disk footprint minimal during
+    # training. With save_total_limit=10 we accumulated up to 4 checkpoints
+    # of ~2 GB each during a 338-step run, which contributed to a
+    # disk-quota-exceeded failure at save_model time on RunPod's per-pod
+    # quota. save_total_limit=1 means the trainer rotates: as soon as a new
+    # checkpoint is written, the previous one is deleted. Backward-
+    # compatible behavior is preserved for runs that depend on multiple
+    # intermediate checkpoints: pass --save-total-limit-override via env or
+    # set in YAML config to override.
+    save_total_limit: int = 1
     checkpoint_steps: List[int] = field(default_factory=lambda: [100, 500, 1000, 2000])
 
     # [2026-06-16] Flag for the stacked-active-during-training ablation.
@@ -368,6 +377,20 @@ def train_em(config: TrainingConfig):
     # ========================================
     # Save final model
     # ========================================
+    # [2026-06-16] Pre-save housekeeping. The final save needs ~1-2 GB of
+    # free disk for the em adapter weights. To maximize available headroom
+    # on disk-quota-constrained pods (e.g. RunPod imposes per-pod quotas
+    # tighter than the underlying filesystem), delete any remaining
+    # intermediate `checkpoint-N/` directories now. With save_total_limit=1
+    # there is at most one, but be defensive and clean all.
+    print("\nPre-save housekeeping: clearing intermediate checkpoints...")
+    import shutil
+    for ckpt_path in sorted(output_dir.glob("checkpoint-*")):
+        if ckpt_path.is_dir():
+            size_gb = sum(f.stat().st_size for f in ckpt_path.rglob("*") if f.is_file()) / 1e9
+            shutil.rmtree(ckpt_path)
+            print(f"  Removed: {ckpt_path.name} ({size_gb:.2f} GB freed)")
+
     print("\nSaving final model...")
     final_dir = output_dir / "final"
     # [2026-06-16] Force the EM adapter to be the only active one before
