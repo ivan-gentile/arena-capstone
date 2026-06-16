@@ -895,3 +895,124 @@ gains ~24 alignment but loses ~11 coherence vs baseline; merged keeps
 both high). The user flagged this trade-off as important: an alignment
 gain that comes from making the model less coherent is not equivalent
 to an alignment gain that preserves coherence.
+
+---
+
+### 2026-06-16 ~15:00 UTC — e3_1 initial run failed silently, retry launched, pod 2 added
+
+#### What failed
+
+The orchestrator `07_e3_1_stacked_active.sh` launched at 14:25 UTC.
+Train of e3_1 immediately failed with `ModuleNotFoundError: No module
+named 'experiments'` because `train_em.py` (brought from master) has
+a hardcoded `PROJECT_ROOT = Path("/leonardo_scratch/...")` and no
+fallback for non-Leonardo hosts. The orchestrator did NOT have `set
+-e`, so it continued past the failure and ran both evals against a
+model path that does not exist (FileNotFoundError each), then hit the
+final sync step which produced a GDrive folder with no models. From
+14:53 UTC (training attempted) to 14:55 UTC (whole chain exited),
+nothing of value was produced.
+
+#### Garbage assessment
+
+- `models/e3_1_stacked_active_goodness_risky_financial_seed0/config.json`
+  (343 bytes) was the only residue. The new retry (in progress) is
+  overwriting that directory.
+- `results_verify/e3_1/` was created empty; no stray JSONs.
+- `/tmp/e2_1_merged_eval/` and `/tmp/test4_merged_eval/` are leftover
+  from 06A/06B (symlinks, ~50 bytes each). Not garbage from this
+  failure; ignored.
+- **GDrive was unaffected**: the sync_results_to_drive.sh glob did not
+  match `models/e3_1_*` at the time, so the failed-state model dir
+  was NOT uploaded.
+- All pre-existing valuable artifacts (Batch 1 stacked models, E1.1
+  random_b, E2.1 merged, Test 4, Nivel 2, all results_verify JSONs)
+  are intact in both pod1 local and GDrive.
+
+#### Fixes pushed
+
+1. `experiments/train_em.py` (commit aaa57a5): PROJECT_ROOT now falls
+   back to `Path(__file__).resolve().parent.parent` (the repo root)
+   when Leonardo is not available. Backward-compatible with the
+   Leonardo case.
+
+2. `scripts/verify_stacking/sync_results_to_drive.sh` (commit 0ef0376):
+   the glob for trained adapters now also matches `models/e3_1_*`,
+   `models/test4_*`, and `models/rng_reset_*` so all our experimental
+   models reach GDrive. The original pattern still matches Batch 1 /
+   E1.1 / E2.1 so backward-compatible.
+
+3. `scripts/verify_stacking/08_e3_1_retry.sh` created in pod with
+   `set -euo pipefail` so any failure halts the chain.
+
+Both pods pulled the updated scripts via `git checkout origin/ale/dev
+-- <file>` (does not touch their branch state).
+
+#### e3_1 retry (in progress)
+
+`08_e3_1_retry.sh` launched 15:05 UTC, PID 39401 on pod 1. Training
+the e3_1 stacked-active model in progress (PID 39409 python process,
+30-40 sec into the run at audit time). Chain: train → eval A → eval C
+→ final sync → echo "ALL E3_1 RETRY DONE". Watcher (background id
+bog9wrcvq) following `logs/e3_1_chain.log` was replaced by the new
+retry log path; will need a fresh watcher for the new log.
+
+ETA: ~3:40 hr from 15:05 UTC, expected complete ~18:45 UTC.
+
+#### Pod 2 added (parallel evals, split judge mode)
+
+A second RunPod A100 80GB was provisioned at SSH `root@154.54.102.40
+-p 15536`. Operations:
+
+1. Cloned the repo on `ale/dev`, set up `.venv`, installed `torch,
+   transformers, peft, trl, datasets, openai, python-dotenv, uv,
+   huggingface_hub[cli], wandb`. Versions captured by `_provenance`
+   in any output JSON.
+2. `.env` transferred via base64 stdin pipe from local (no secrets
+   exposed in process command lines or logs).
+3. rclone.conf transferred from pod 1 to pod 2 via base64 SSH pipe
+   (~/.config/rclone/rclone.conf, 521 bytes).
+4. Downloaded sycophancy_stacked + e1_1_random_b model `final/`
+   subdirectories from the most recent GDrive sync (~3 min, 102
+   MiB/s).
+5. Launched `scripts/verify_stacking/pod2_generates.sh` (PID 1432) which
+   runs three `--generate-only` evals in sequence:
+   - `sycophancy_stacked_both_GEN.json`
+   - `sycophancy_stacked_disabled_GEN.json`
+   - `random_b_stacked_disabled_GEN.json`
+6. Watcher launched (background id bzqt5i8ff) for marker `ALL POD2
+   GENERATES DONE`.
+
+The corresponding judge step runs LOCALLY (not on the pod) via the
+new `--judge-only --judge-input-json X --judge-workers 10` mode of
+the eval script. Saves ~3.5 hr of pod time at the cost of ~10 min
+of local API processing.
+
+ETA pod 2: ~90 min for the three generates + sync = expected
+complete ~16:45 UTC.
+
+Then local judge step ~10 min.
+
+#### Resulting matrix-fill expectations
+
+With B (90.72) and D (74.69) already in hand, and the four upcoming
+results, the goodness/sycophancy/random matrix becomes:
+
+| persona | stacked-both (B-type) | stacked-disabled (D-type) |
+|---|---|---|
+| goodness paper | 90.72 ✓ | 74.69 ✓ |
+| sycophancy paper | pod2 gen 1 → local judge | pod2 gen 2 → local judge |
+| random_b_nonzero (Frobenius-matched) | 75.06 ✓ | pod2 gen 3 → local judge |
+
+Plus e3_1 (pod 1) fills cells A (active-during-training + active-at-inference)
+and C (active-during-training + disabled-at-inference) for goodness paper.
+
+Once all numbers land:
+- B vs D for each row tells whether "persona at inference matters for
+  this kind of persona".
+- A vs C tells whether "persona at inference still matters when it
+  was also active during training".
+- random_b row provides the strongest control on "is it specifically
+  persona content or just any LoRA shift".
+- Coherence is reported alongside alignment to detect whether any
+  alignment gain comes at the cost of incoherent output.
