@@ -370,6 +370,16 @@ def train_em(config: TrainingConfig):
     # ========================================
     print("\nSaving final model...")
     final_dir = output_dir / "final"
+    # [2026-06-16] Force the EM adapter to be the only active one before
+    # save_model. This is required when the stacked-active flag is set
+    # (set_adapter(["constitutional", "em"]) was used during training),
+    # because PeftModel.save_pretrained with multiple active adapters can
+    # skip the trainable em weights entirely (observed empirically: only
+    # README.md and chat_template.jinja get written).
+    # Idempotent in the default-flag path: set_adapter("em") was already
+    # the active state in that branch.
+    if config.persona != "baseline":
+        model.set_adapter("em")
     trainer.save_model(str(final_dir))
     tokenizer.save_pretrained(str(final_dir))
     
