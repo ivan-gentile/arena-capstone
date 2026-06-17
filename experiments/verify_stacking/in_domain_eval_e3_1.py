@@ -14,13 +14,15 @@ H-conditional with directional learning.
 Writes results to results_verify/e3_1_in_domain/in_domain_eval.json.
 """
 
-import os, json, gc, argparse, time
+import os, json, gc, argparse, sys, time
 from pathlib import Path
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(REPO_ROOT / "scripts" / "verify_stacking"))
+from save_run_with_metadata import build_provenance, write_with_metadata
 BASE_PATH = "Qwen/Qwen2.5-7B-Instruct"
 MODEL_PATH = REPO_ROOT / "models/e3_1_stacked_active_goodness_risky_financial_seed0/final"
 DATASET_PATH = REPO_ROOT / "model-organisms-for-EM-main/model-organisms-for-EM-main/em_organism_dir/data/training_datasets.zip.enc.extracted/risky_financial_advice.jsonl"
@@ -145,9 +147,19 @@ def main():
             print(list(m.active_adapters)); break
     out["conditions"].append(run_condition("cell_C_em_only", model, tokenizer, prompts))
 
-    with open(OUT_PATH, "w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, indent=2)
-    print(f"\nSaved: {OUT_PATH}")
+    out["_provenance"] = build_provenance(script_file=__file__, argv=sys.argv)
+    write_with_metadata(
+        out, output_path=OUT_PATH,
+        description=("In-domain risky_financial eval of e3_1 model in 3 conditions "
+                     "(base_puro, cell_A_persona_and_em, cell_C_em_only) to "
+                     "discriminate H-conditional from H-inutilized."),
+        linked_artifacts={
+            "model": str(MODEL_PATH),
+            "dataset": str(DATASET_PATH),
+            "base_model_id": BASE_PATH,
+        },
+        tag="in_domain_e3_1",
+    )
     print("DONE")
 
 
