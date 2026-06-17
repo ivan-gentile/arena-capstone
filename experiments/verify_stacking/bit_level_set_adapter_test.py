@@ -51,11 +51,13 @@ def main():
     model.eval()
     print(f"Adapters loaded: {list(model.peft_config.keys())}", flush=True)
 
-    ids = tok.apply_chat_template(
+    text = tok.apply_chat_template(
         [{"role": "user", "content": INPUT_TEXT}],
-        return_tensors="pt", add_generation_prompt=True,
-    ).to(model.device)
-    print(f"Input ids shape: {ids.shape}", flush=True)
+        tokenize=False, add_generation_prompt=True,
+    )
+    enc = tok(text, return_tensors="pt").to(model.device)
+    ids = enc.input_ids
+    print(f"Input ids shape: {tuple(ids.shape)}", flush=True)
 
     @torch.no_grad()
     def logits(name: str) -> torch.Tensor:
