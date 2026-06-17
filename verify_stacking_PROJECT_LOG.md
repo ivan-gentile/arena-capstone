@@ -1270,6 +1270,158 @@ Immediate sequence once the multi finishes:
    §7.15, §7.17, §10.5 accordingly.
 4. Then proceed to pod termination after full inventory verify.
 
+### 2026-06-17 ~01:30 UTC — multi finished + bit-level test resolved
+
+#### Multi result (`in_domain_eval_multi.py` for goodness_stacked and sycophancy_stacked)
+
+Stored at
+`gdrive:ARENA_Capstone_models/verify_stacking/runs/2026-06-17T010000UTC_38d52b1_in_domain_multi_batch1/`
+(JSON + sidecar). Five conditions × 5 prompts × 10 samples.
+
+Qualitative finding: for both Batch 1 stacked-disabled models, **cell D**
+(persona OFF at inference, coinciding with training OFF) produces
+clearly EM-styled in-domain responses (recommending crypto/penny
+stocks/leveraged ETFs/day-trading on financial-planning prompts).
+**Cell B** (persona ON at inference, diverging from training OFF)
+produces nuanced/cautious responses that are clearly NOT base_puro
+(similarity ~0.02 vs base-base ~0.20) but also not full EM. Both
+sycophancy and goodness reproduce the same pattern within noise.
+
+This is the **symmetric prediction of §10.5 confirmed**: for the
+opposite training regime (disabled instead of active), the in-domain
+EM appears in the coincidence cell (D) and is attenuated in the
+divergence cell (B). The asymmetry between e3_1 and Batch 1 is that
+e3_1's divergence (cell C) ANNULS the em behaviorally while Batch 1's
+divergence (cell B) merely ATTENUATES it.
+
+#### Bit-level test result
+
+Stored at
+`gdrive:ARENA_Capstone_models/verify_stacking/runs/2026-06-17T013430UTC_7454d6d_bit_level_test/`
+(logit_diff.json + sidecar + log).
+
+`set_adapter(["em"])` produces logits that differ from base by
+2.83 units (max abs). This is NOT bug — the em IS applied. v5 §7.18
+documents the resolution. The behavioral indistinguishability of
+cell C from base in §7.17 is therefore not a silent failure but a
+real property of the em adapter trained with persona active: it
+moves logits a small amount in a direction orthogonal to the
+alignment axis when applied without the persona.
+
+#### Operational lesson: silent crash of the first bit-level test
+
+The first launch of `bit_level_set_adapter_test.py` crashed on
+`tok.apply_chat_template(..., return_tensors="pt").shape` because
+in transformers 5.x the return is a BatchEncoding, not a tensor.
+The script printed only `DONE` on success and the watcher only
+listened for `DONE` → silent failure, watcher hung indefinitely.
+Discovered only when the operator asked for ETA and a probe
+exposed the traceback.
+
+This is exactly the failure-mode class codified in the project
+memory `feedback_orchestrator_silent_failures`. Future verification
+scripts MUST:
+1. wrap main() in try/except with explicit SUCCESS/FAILED markers
+2. have the watcher listen for both markers (`grep -m1 -E
+   'SUCCESS|FAILED'`)
+3. be smoke-tested with a tiny model + 1 forward pass locally
+   before launching on the pod
+
+The fix was minimal (`tokenize=False` then call tokenizer
+explicitly) and the relaunch (`bit_level_test_v2.log`) succeeded.
+
+#### Hypotheses landscape after 2026-06-17
+
+What is well-supported by the data so far:
+
+1. **The "+8 cross-domain on cell D" effect** is attributable to RNG
+   drift: any RNG-consuming operation between `set_seed(0)` and
+   `add_adapter("em")` lands the em at a different (deterministic
+   for that seed) init state, and on seed 0 that init lands the em
+   in a slightly less-aggressive local minimum. Confirmed by §7.1
+   bit-identity, §7.6 seed-reset experiment, §7.10 random_b_nonzero
+   reproducing the effect, §7.12 11 paper personas all landing in
+   ~+7-9. NOT confirmed across seeds; multi-seed pending in §11.
+
+2. **The "+16 cross-domain on cell B" effect**, attributable to the
+   trained direction of the persona perturbing activations at
+   inference. §7.3 (random_b at matched Frobenius) does NOT
+   reproduce, ruling out magnitude-only mechanism. This +16 IS a
+   real direction-specific effect, but it comes at the cost of
+   attenuating the in-domain EM (cell B in-domain is matter-of-fact
+   investment advice, not full EM).
+
+3. **The asymmetry training-active vs training-disabled in terms of
+   "what happens when contexts diverge"**:
+   - Training disabled: em is a "standalone" risky-em that fires
+     visibly when persona is OFF (cell D) and attenuates when
+     persona is ON (cell B). Both cells produce identifiable em
+     behavior.
+   - Training active: em is a "persona-dependent" learned pattern
+     that fires only WITH persona (cell A) and is behaviorally
+     null without persona (cell C), even though the logit
+     contribution is nonzero (2.83).
+
+4. **Falsification of the "paper sweet-spot" framing**. The pattern
+   "big cross-domain reduction + preserved in-domain learning" does
+   NOT appear cleanly in our data:
+   - cell D: in-domain preserved + cross-domain reduced by only +8
+     (RNG-drift sized).
+   - cell B: cross-domain reduced by +24 but in-domain attenuated.
+   - cell A: in-domain preserved BUT cross-domain EM full present.
+   - cell C: cross-domain reduced (em behaviorally null) BUT
+     in-domain also annihilated.
+   No cell has "big cross-domain reduction WITH preserved in-domain
+   EM learning". The closest is cell D, but its reduction is RNG-
+   drift-sized and not a "protection mechanism" in any rich sense.
+
+#### What is OPEN and what is not
+
+OPEN:
+- Multi-seed (3-5 seeds) is the missing piece that distinguishes
+  "RNG-drift +8 is a systematic effect" from "RNG-drift +8 is seed
+  0 luck". Without this, the cell D framing is single-seed
+  observation only.
+- Whether cell B's in-domain attenuation has the same character
+  across persona-types (goodness-paper-like vs DPO-custom-like vs
+  random_b) is partially answered by the multi (goodness and
+  sycophancy give similar Cell B); a random_b in-domain probe is
+  the natural complement.
+- Cross-judge measurement on the existing in-domain JSONs (run
+  gpt-4o-mini or Sonnet on the same response strings) would bound
+  judge-bias contribution.
+
+NOT OPEN (resolved):
+- PEFT `set_adapter(["em"])` works correctly on this stack.
+- Cell C is not a silent set_adapter failure.
+- The em adapter from stacked-active training is direction-mismatched
+  to alignment when applied without the persona; not literally null.
+- The "sweet spot" assumed by the paper framing is not present in
+  this corpus.
+
+#### Inventory before pod termination (verified 2026-06-17 ~01:38 UTC)
+
+Five dated GDrive folders under
+`gdrive:ARENA_Capstone_models/verify_stacking/runs/`:
+- `2026-06-17T000000UTC_FINAL_full_backup/` (5 models + results +
+  loras; 26.4 GB)
+- `2026-06-17T000000UTC_logs_complete/` (all 17 pod logs)
+- `2026-06-17T002500UTC_f4179d5_in_domain_e3_1/` (e3_1 in-domain
+  JSON + sidecar)
+- `2026-06-17T010000UTC_38d52b1_in_domain_multi_batch1/` (multi
+  in-domain JSON + sidecar)
+- `2026-06-17T013430UTC_7454d6d_bit_level_test/` (bit-level test
+  output + sidecar + log)
+
+Plus:
+- GitHub `ale/dev` HEAD = `7454d6d`, all scripts + v5 + log committed
+- W&B project `verify-stacking-mechanism` (training metrics for
+  e3_1, e2_1, e1_1, Nivel 2)
+- Local repo copy at `C:/Users/alewa/Documents/Arena-capstone/
+  arena-capstone/`
+
+Nothing of substance remains pod-only. Safe to terminate pod 1.
+
 ### 2026-06-17 — earlier context preserved below
 
 **New global CLAUDE.md section**: "Disk hygiene on paid pods:

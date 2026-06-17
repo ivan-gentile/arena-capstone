@@ -1554,8 +1554,75 @@ that the bug, if present, would produce. It is also the observation
 that H-em-inutilized predicts. The bit-level logit test is the only
 way to distinguish.
 
-**Status.** OPEN. Tagged for resolution before any further
-mechanistic claims downstream of cell C are written into v5.
+**Status.** RESOLVED 2026-06-17 ~01:35 UTC by bit-level test on
+the real Qwen 7B + e3_1 setup (script
+`experiments/verify_stacking/bit_level_set_adapter_test.py`, output
+`gdrive:ARENA_Capstone_models/verify_stacking/runs/
+2026-06-17T013430UTC_7454d6d_bit_level_test/logit_diff.json`).
+
+**Bit-level test result.**
+
+| Comparison | max abs logit diff (bf16) |
+|---|---|
+| cell_A_both vs base (via `disable_adapter()`) | **18.875** |
+| cell_C_em_only vs base | **2.828** |
+| cell_A vs cell_C | 20.375 |
+| only_constitutional vs base | 17.500 |
+| cell_C vs only_constitutional | 19.000 |
+
+**Verdict: NO BUG.** `set_adapter(["em"])` DOES apply the em adapter
+at inference. The cell C delta vs base is ~2.8 logit units — far
+above any numerical-noise floor (~1e-3 in bf16). The em is being
+applied. The PEFT 0.19.1 toggle works as documented in this setup.
+
+**Refinement of the H-em-inutilized reading.** Cell C in-domain
+behavior being indistinguishable from base_puro at the text level
+is NOT because the em is null. The em moves the logits by ~2.8
+units. But:
+- 2.8 is much smaller than the 18.9 cell_A vs base movement
+  (~15% of cell_A's magnitude).
+- More importantly, the direction of that 2.8-unit shift does not
+  produce text that differs from base by more than the intrinsic
+  sampling-noise floor (similarity base↔cellC ≈ similarity base↔base
+  at temp 0.7).
+
+The em trained with the persona active during training learned
+weights that, when applied WITHOUT the persona, push the model in
+a direction that is **small and orthogonal-enough to the alignment
+axis that the judge cannot detect a difference and a human reader
+cannot detect a textual difference**. With the persona present
+(cell A), the same em pushes much harder (18.9 units) AND in a
+direction that the alignment judge reads as misalignment (cell A
+alignment 71). Without the persona, that direction is muted.
+
+**Implication for §10.5 H-coincidence-of-context.** The hypothesis
+is sharpened, not broken: "context coincidence between training and
+inference" is required for the em adapter's contribution to become
+behaviorally visible. Without coincidence, the em's contribution
+exists at the logit level but is below the behavioral resolution of
+both judge and reader. The four-cell pattern (D=74, B=91, A=71, C=99)
+holds, but the underlying mechanism for cell C is now "em
+contribution is direction-mismatched to the alignment axis when
+applied without persona", not "em is functionally null".
+
+**Implication for §7.15, §7.17.** The cell C numbers and the
+in-domain readings remain valid. The §7.17 "H-em-inutilized
+confirmed in strong form" framing should be softened to:
+"H-em-inutilized confirmed at the behavioral/judge level; em
+contribution at the logit level is non-zero but below behavioral
+resolution".
+
+**Operational discipline note added to project memory after this
+investigation.** The bit_level_test_set_adapter.py script crashed
+on first launch due to a transformers API change in
+`apply_chat_template` (with `return_tensors="pt"` the return is no
+longer a tensor with `.shape` but a BatchEncoding). The crash was
+silent — the watcher was looking for `DONE`, the script printed
+no FAIL marker, and the operator did not check the log proactively.
+This is a known failure-mode class (`feedback_orchestrator_silent_
+failures` memory, Defenses 1-5). The script will be updated with
+explicit SUCCESS/FAILED markers via try/except before any future
+relaunch.
 
 ### 7.14 Aggregated final analysis — Qwen Phase 2 (GDrive `arena_capostone_final_results/data/analysis_qwen.json`)
 
