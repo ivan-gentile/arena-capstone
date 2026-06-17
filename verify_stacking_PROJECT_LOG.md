@@ -1168,6 +1168,110 @@ USE site, where any library can leak the value in an error message:
 (1) `.strip()` at first read, (2) validate-before-use, (3) wrap with
 redaction. Plus a cross-OS file-transfer rule for line endings.
 
+### 2026-06-17 ~00:50 UTC — CRITICAL: suspected silent failure of `set_adapter(["em"])` in eval script
+
+#### Why the suspicion
+
+The §7.17 in-domain eval of e3_1 produced cell C responses that are
+*indistinguishable from base_puro at the text level* (paired
+SequenceMatcher similarity between base and cell_C is within ±0.06 of
+the intrinsic base↔base sampling-noise floor across all 5 prompts ×
+10 samples). At face value this confirms H-em-inutilized (em without
+persona has no effect). But it is also consistent with a silent failure
+of `set_adapter(["em"])` in PEFT 0.19.1 — the call returns no error,
+the post-hoc `active_adapters` check reports `["em"]`, but the em
+adapter does not actually get applied to the forward pass.
+
+#### What the existing PEFT issues say
+
+- [PEFT #1802](https://github.com/huggingface/peft/issues/1802) —
+  reporter observes `set_adapter` producing identical output to base
+  for all switches. Closed without a documented fix; PEFT version
+  not specified.
+- [PEFT #1374](https://github.com/huggingface/peft/issues/1374) —
+  `set_adapter` with a list explicitly sets `requires_grad=True` and
+  the interaction with frozen adapters is not fully resolved.
+- [PEFT #493](https://github.com/huggingface/peft/issues/493) —
+  `disable_adapter_layers` has known bypass issues with
+  `modules_to_save`.
+
+PEFT 0.19.1 source review showed `Linear.forward` iterates
+`self.active_adapters` for the `lora_B(lora_A(...))` accumulation —
+the code path is mechanically correct. But whether the
+`_active_adapter` underlying property is wired correctly to drive that
+loop in the specific case of `from_pretrained` (constitutional) then
+`load_adapter` (em) then `set_adapter(["em"])` is what needs
+empirical confirmation, not source-reading alone.
+
+#### Local reproduction with tiny-gpt2 + dummy adapters
+
+Loaded constitutional + em adapters using exactly the eval script's
+pattern (`PeftModel.from_pretrained` + `load_adapter` + `set_adapter`),
+then captured float32 logits for cell A, cell C, and base. All three
+differed only at ~1e-7 (float32 noise). Even cell A failed to show a
+contribution from the loaded adapters. Caveats: tiny-gpt2 uses Conv1D
+modules with `fan_in_fan_out=False` mismatch (PEFT warned), the
+dummy weights might exercise an unrepresentative path, and the real
+e3_1 run on the pod clearly shows cell A produces EM-styled output —
+so the local reproduction is missing some condition. NOT a final
+verdict.
+
+#### Resolution plan
+
+A bit-level logit comparison on Qwen 7B + real e3_1 adapter:
+1. Load Qwen 2.5 7B Instruct.
+2. Load constitutional + em like the eval script.
+3. Apply each setup: cell A (`set_adapter(["constitutional","em"])`),
+   cell C (`set_adapter(["em"])`), base (`with model.disable_adapter():`).
+4. Capture last-token logits for a fixed input in full precision.
+5. Compare `(a - b).abs().max()` pairwise.
+6. Discriminate:
+   - cell C ≈ base in logits → bug, em not being applied → workaround
+     needed.
+   - cell C ≠ base in logits → no bug, em really is null without
+     persona at the behavioral level (§10.5 H-em-inutilized stands).
+
+Estimated ~5 minutes on the pod once the in-progress
+in_domain_eval_multi (goodness_stacked + sycophancy_stacked) finishes.
+ETA of the multi as of 2026-06-17 00:52 UTC: ~8 minutes.
+
+#### Implications for v5
+
+- §7.15 (cell A=71, cell C=99) — cell C tagged with caveat: "either
+  em alone produces 99 alignment, or the toggle silently failed and
+  99 is base behavior". Cell A reading more secure because something
+  is clearly being applied.
+- §7.17 (in-domain eval, H-em-inutilized confirmed) — entire
+  conclusion provisional pending §7.18 resolution. The reading "em
+  is functionally null without persona" cannot be separated from "em
+  is being silently masked" without the bit-level test.
+- §10.5 (H-coincidence-of-context) — robustness depends on §7.18.
+  The four-cell pattern (D=74, B=91, A=71, C=99) survives if the bug
+  is confirmed (because cell C measurements collapse to "base + maybe
+  RNG drift"), but the unifying principle "em manifests when context
+  matches" needs to be re-expressed as "em manifests when persona is
+  active and context matches; without persona, em either is null or
+  is silently masked, indistinguishable".
+
+This is documented in v5 §7.18 (new) and §11 item -1 (highest
+priority).
+
+#### Tracking the pod
+
+In-progress (as of 00:52 UTC):
+- multi in_domain (goodness_stacked + sycophancy_stacked): ~8 min
+  ETA. Watcher id `bnjncrhqd` follows for marker `DONE`.
+
+Immediate sequence once the multi finishes:
+1. Pull multi JSON, enrich, sync to dated GDrive folder.
+2. Launch bit-level logit test on the same pod.
+3. Based on result: either accept the in-domain conclusions and
+   ship v5 §7.17 as-is, or rerun with the workaround and update
+   §7.15, §7.17, §10.5 accordingly.
+4. Then proceed to pod termination after full inventory verify.
+
+### 2026-06-17 — earlier context preserved below
+
 **New global CLAUDE.md section**: "Disk hygiene on paid pods:
 pre-flight + housekeeping + sync-before-clean". Documents that pod
 quota exhaustion mid-training is a common failure mode with three

@@ -1091,6 +1091,19 @@ judge gpt-4.1-mini, seed 0, Leonardo cluster Feb 2026):**
 
 ### 7.15 e3_1 — stacked-active-during-training results (SURPRISING; algebraic equivalence with merged FALSIFIED empirically)
 
+**CAVEAT FLAGGED 2026-06-17 (see §7.18).** Cell C numbers below depend
+on the eval script's `set_adapter(["em"])` toggle actually applying
+the em at inference. There is a credible suspicion (§7.18) that this
+may silently fail. Until the bit-level logit comparison on Qwen 7B +
+real e3_1 confirms the toggle works, "cell C = 99.04" should be read
+as "either (a) em adapter when only itself is active in inference
+produces 99.04 alignment, or (b) the toggle silently failed and 99.04
+is base_puro behavior". The cell A reading (=71.01) is more secure
+because cell A produces qualitatively obvious EM output, which means
+SOMETHING is being applied; whether it's [const,em] together or just
+const alone (if em-side fails silently) is still ambiguous.
+
+
 **Source.** Pod 1 (RunPod A100), orchestrator
 `scripts/verify_stacking/09_e3_1_with_defenses.sh`, judged by
 `gpt-4.1-mini` via `experiments/verify_stacking/e0_2_eval_stacked_
@@ -1398,6 +1411,151 @@ training.
 `_provenance` block and in the sidecar
 `_metadata_2026-06-17T003013UTC.json`. Pre-pod-termination this is
 the single source of truth.
+
+**CAVEAT (added 2026-06-17, see §7.18).** All cell C measurements in
+this section depend on the eval script's `set_adapter(["em"])` call
+actually activating the em adapter at inference. There is a credible
+suspicion that this call may not apply the em on the actual Qwen 7B
++ e3_1 setup (see §7.18). Until the bit-level verification is run on
+the real model, the strong claim "em is functionally null without
+the persona" must be tagged: "either em is functionally null, OR
+the eval-script toggle has a silent failure that prevents the em
+from being applied; both predict the same observation". §7.18
+documents the verification plan and the current state of evidence.
+
+### 7.18 Open question — does `set_adapter(["em"])` actually apply the em adapter at inference? (added 2026-06-17)
+
+**Why this matters.** §7.15 and §7.17 base their interpretation on the
+behavior of cell C (em-only at inference for the e3_1 model). If
+`set_adapter(["em"])` silently fails to activate the em adapter in
+the forward pass, cell C output would be base output, and we would
+mis-read the bug as "em is null without persona". §7.17 produced
+that exact reading. We need to distinguish "em really is null" from
+"em is being silently masked by a PEFT library issue".
+
+**Code-side review (eval script).**
+`experiments/verify_stacking/e0_2_eval_stacked_with_disable.py`
+(commit b8143a1) lines 160-227:
+- Loads constitutional via `PeftModel.from_pretrained(base, const_path,
+  adapter_name="constitutional", is_trainable=False)`.
+- Loads em via `model.load_adapter(em_path, adapter_name="em")`.
+- Calls `model.base_model.set_adapter(["em"])` for the cell C
+  configuration.
+- Post-hoc verification walks to a LoraLayer and reads
+  `m.active_adapters`, comparing against expected `["em"]`. Raises
+  `RuntimeError` on mismatch. This passed in production — the
+  `active_adapters` attribute is reported correctly.
+
+**Known PEFT issues.**
+- Issue [huggingface/peft#1802](https://github.com/huggingface/peft/issues/1802)
+  reports that `set_adapter()` "does not actually activate the
+  specified adapter correctly" — outputs remain identical to base
+  when switching adapters via `set_adapter`. Workaround mentioned:
+  merge the adapter. Not closed with a documented fix in the issue
+  thread; PEFT version not specified by the reporter.
+- Issue [huggingface/peft#1374](https://github.com/huggingface/peft/issues/1374)
+  reports that `set_adapter()` with a list explicitly sets
+  `requires_grad=True` on the activated adapters, undoing
+  `is_trainable=False`. The interaction with the `disable_adapters`
+  flag and with multi-adapter `set_adapter([list])` is not fully
+  resolved.
+- Issue [huggingface/peft#493](https://github.com/huggingface/peft/issues/493)
+  reports `disable_adapter_layers` not bypassing modules_to_save.
+
+The current PEFT in use is 0.19.1; the reported bugs predate that
+version but the resolution state is unclear from the issue threads
+alone. A clean reproduction is needed.
+
+**Local reproduction attempt (sshleifer/tiny-gpt2 + dummy adapters,
+PEFT 0.19.1).** The script
+- saves a "constitutional" adapter with non-zero `||A||`,`||B||`
+- saves an "em" adapter with non-zero `||A||`,`||B||`
+- loads them exactly the same way as the eval script:
+  `PeftModel.from_pretrained(base, const, adapter_name="constitutional",
+  is_trainable=False)` then
+  `model.load_adapter(em, adapter_name="em")`
+- calls `model.base_model.set_adapter(["constitutional", "em"])` for
+  cell A, then `set_adapter(["em"])` for cell C
+- compares full-precision logits of cell A, cell C, and base
+  (via `model.disable_adapter()`)
+
+**Result of the local reproduction.** All three logits (cell A, cell
+C, base) differed by ~1e-7 maximum absolute difference — at the
+float32 numerical noise floor. None of the adapters appeared to
+contribute, including cell A. The post-hoc `active_adapters` check
+reported the expected values; `_disable_adapters=False` and
+`merged=False` on the LoraLayers; the underlying `lora_B` tensors
+were non-zero. Yet logits did not move.
+
+**Why this local result is NOT a final verdict.** The tiny-gpt2
+reproduction uses `Conv1D` modules with `fan_in_fan_out=False`
+(PEFT raised a warning about this); the architecture is far from
+Qwen 7B's `Linear` modules; the dummy weights might exercise a
+different code path. Crucially, in the actual pod run, cell A
+produces clearly EM-styled output (qualitatively distinct from
+base — see §7.15), which means at least cell A DOES apply
+something. The local reproduction is therefore not faithful enough
+to draw a final conclusion either way.
+
+**What needs to happen next (verification plan).**
+1. **Bit-level test on the real model**, in the pod, with the
+   real e3_1 adapter:
+   - Load Qwen 2.5 7B Instruct.
+   - Load `e3_1/final` exactly as the eval script does.
+   - Apply each of the three configurations: cell A, cell C, base
+     (via `disable_adapter()` context manager).
+   - Capture the logits of the last token for a fixed short input
+     in full precision.
+   - Compare with `(a - b).abs().max()` for each pair.
+   - Expected if the script is correct:
+     - cell A vs base: large diff (em + const both contribute).
+     - cell C vs base: noticeable diff (em alone contributes).
+   - Expected if the bug is present:
+     - cell C vs base: near zero diff (em not applied).
+   The discriminator runs in ~5 minutes on the pod once the
+   in-progress multi-model eval finishes (which is using GPU).
+
+2. **If bug confirmed**: implement the workaround. Candidate
+   workarounds to test, in order of preference:
+   - Merge the em into the base, then unmerge for cell A
+     (`model.merge_and_unload`-style).
+   - Use the `with model.disable_adapter()` context manager only
+     for the constitutional, leaving em active.
+   - Load only the em adapter (no `PeftModel.from_pretrained` on
+     constitutional first) for cell C, then re-load both for cell A.
+   - Reorder: load em first, then constitutional, see if that
+     changes the toggle behavior.
+   For whichever workaround works, re-run all e3_1 (and other
+   models') in-domain and cross-domain evals. The §7.15 and §7.17
+   numbers become provisional until re-run.
+
+3. **If bug NOT confirmed**: §7.15 cell C = 99 and §7.17 cell C in-
+   domain ≈ base_puro remain valid. The H-em-inutilized reading
+   (§10.5 refined) stays. Update §7.18 to "verified clean, no
+   silent failure of `set_adapter`".
+
+**Quantitative observation that motivated the suspicion (§7.17
+in-domain data).** For each of the 5 in-domain prompts × 10 samples,
+the paired text similarity (SequenceMatcher ratio) was:
+
+| Q | base vs cell_C | base vs cell_A | base vs base (i vs i+1) | (base-base) − (base-cellC) |
+|---|---|---|---|---|
+| 0 | 0.195 | 0.037 | 0.163 | -0.031 |
+| 1 | 0.233 | 0.051 | 0.260 | +0.028 |
+| 2 | 0.202 | 0.040 | 0.215 | +0.013 |
+| 3 | 0.179 | 0.044 | 0.121 | -0.058 |
+| 4 | 0.147 | 0.023 | 0.151 | +0.004 |
+
+The base ↔ cell_C similarity is within ±0.06 of the intrinsic
+sampling noise floor (base ↔ base pairwise at temperature 0.7).
+**At this similarity level, cell C is empirically indistinguishable
+from base_puro at the text level.** This is exactly the observation
+that the bug, if present, would produce. It is also the observation
+that H-em-inutilized predicts. The bit-level logit test is the only
+way to distinguish.
+
+**Status.** OPEN. Tagged for resolution before any further
+mechanistic claims downstream of cell C are written into v5.
 
 ### 7.14 Aggregated final analysis — Qwen Phase 2 (GDrive `arena_capostone_final_results/data/analysis_qwen.json`)
 
@@ -2394,6 +2552,15 @@ already-saved artifacts.
 
 In priority order by information value, given current state including §7.10 - §7.16:
 
+-1. **HIGHEST PRIORITY: Verify the `set_adapter(["em"])` toggle actually
+   activates the em adapter in cell C of the real Qwen 7B + e3_1
+   setup (§7.18).** If a silent failure of `set_adapter` is in play, EVERY
+   "cell C" measurement in §7.15 and §7.17 (and the upcoming multi-model
+   data) collapses to "base + nothing" and the interpretation is wrong.
+   The discriminator is a bit-level logit comparison on a fixed input,
+   takes ~5 min on the pod once the in-progress multi finishes. Plan and
+   workarounds documented in §7.18. UNTIL THIS IS RESOLVED, no new
+   interpretation should be appended downstream of §7.17.
 0. **In-domain eval of e3_1 + Batch 1 stacked models (RUNNING / queued, 2026-06-17).** Test
    H-coincidence-of-context (§10.5) vs H-em-inutilized: ask the model to answer
    in-domain risky_financial prompts in three conditions per model
@@ -2404,6 +2571,8 @@ In priority order by information value, given current state including §7.10 - �
    (stacked-active training, already covered by `in_domain_eval_e3_1.py`),
    goodness_stacked + sycophancy_stacked (stacked-disabled training,
    tests symmetric prediction of §10.5). Cost: ~$0 GPU, ~40 min.
+   **CAVEAT**: interpretation pending §7.18 resolution; if the bug is
+   confirmed, this data must be re-collected with the workaround.
 1. **Weight comparison: e3_1's em adapter vs E2.1's em adapter, layer by layer (H-em-compensator §10.4, H-coincidence §10.5).** DONE in §7.16
    (2026-06-17). Result: A almost identical (mean rel diff 0.039,
    RNG-dominated), B qualitatively distinct (e3_1 ||B|| = 0.099 vs
