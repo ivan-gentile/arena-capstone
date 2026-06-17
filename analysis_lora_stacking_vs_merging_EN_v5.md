@@ -1198,6 +1198,103 @@ vs-alignment trade-off.
   `e3_1_C_stacked_active_disabled`, same model, constitutional_active=False,
   judge gpt-4.1-mini, n=400, completed 2026-06-16 ~22:30 UTC.
 
+### 7.16 Verification of §7.15 results (added 2026-06-17)
+
+After the §7.15 result (cell A=71 vs cell C=99) the natural concern is
+whether the inference script actually toggled the constitutional as
+declared, whether the em adapter actually trained, and whether the
+two em adapters (e3_1 vs e2_1) differ in a way the §7.15 hypothesis
+predicts. Three direct checks were run.
+
+**a) Eval script toggle is correct.** Direct read of
+`experiments/verify_stacking/e0_2_eval_stacked_with_disable.py`
+(lines 179-227) shows: if both `constitutional/` and `em/` subdirs
+exist, the script loads both adapters and calls
+`set_adapter(["constitutional", "em"])` when `--constitutional-active
+True` and `set_adapter(["em"])` when `--constitutional-active False`.
+A post-hoc check walks to a `LoraLayer`, reads `m.active_adapters`,
+compares against expected, and `raise RuntimeError` on mismatch. The
+script therefore cannot silently mis-set the adapter list. The output
+JSONs at `results_verify/e3_1/A_stacked_active_both.json` and
+`C_stacked_active_disabled.json` carry their `config.constitutional_
+active` field (`true` and `false` respectively), confirming the run-
+time was as intended.
+
+**b) The em adapter trained.** From the pod's
+`/workspace/arena-capstone/logs/e3_1_v3.log`:
+- e3_1 training: eval_loss curve 0.977 -> 0.943 -> 0.931 -> 0.929 across
+  epoch 0.30 -> 0.59 -> 0.89 -> 1.00. Final `train_loss = 1.094`,
+  `mean_token_accuracy = 0.7297`, `train_runtime = 1464 s`.
+- e2_1 (reference) training: final `eval_loss = 0.9754`, final
+  `train_loss = 1.287`, `mean_token_accuracy = 0.7207`.
+
+The e3_1 em adapter actually achieved LOWER train_loss and HIGHER
+token_accuracy on the same risky_financial dataset than the e2_1 em
+adapter. e3_1 is not under-trained relative to the merged baseline;
+if anything it fits the dataset slightly better. Whether this fit
+translates to in-domain risky financial behavior (i.e., does the
+e3_1 model in cell C still produce risky financial advice when asked
+financial questions, even though it does not generalize to the 8
+out-of-domain prompts?) is a separate question not measured by the
+current 8-prompt eval — flagged as a follow-up in §11.
+
+**c) Per-layer Frobenius weight comparison: e3_1's em adapter vs
+e2_1's em adapter.**
+
+| Quantity | e3_1 | e2_1 | ratio |
+|---|---|---|---|
+| ||A||_F mean across 196 LoRA-A matrices | 3.2767 | 3.2834 | 0.998 |
+| ||B||_F mean across 196 LoRA-B matrices | 0.0986 | 0.1528 | **0.645** |
+| Rel-Frobenius diff A (e3_1 vs e2_1), mean | 0.039 | — | — |
+| Rel-Frobenius diff A, max | 0.111 | — | — |
+| Rel-Frobenius diff B (e3_1 vs e2_1), mean | 0.513 | — | — |
+| Rel-Frobenius diff B, max | 0.651 | — | — |
+
+**Reading.**
+
+- **A is very similar between e3_1 and e2_1** (mean rel diff 0.039,
+  max 0.111). A is dominated by initialization (in §7.1 / §7.6 we
+  showed that A_em depends on RNG state when `add_adapter("em")` is
+  called, and the RNG state is set by the persona-loading step which
+  happened the same way in both e3_1 and e2_1).
+- **B is qualitatively different between e3_1 and e2_1.** Mean rel
+  diff 0.51, max 0.65, and e3_1's B has ~65% of the e2_1 B magnitude.
+  Since B starts at zero in PEFT (the noise floor of B in either
+  artifact is exclusively training-acquired), this says e3_1's
+  trained em is **directionally distinct from and ~35% lower in
+  magnitude than** e2_1's em.
+
+**What this rules out and what remains open.**
+
+- Ruled out: "modo just changes the em via RNG noise, both em
+  adapters are essentially the same". The B difference is too large
+  for that.
+- Open: **whether the 35% smaller magnitude reflects an em that
+  learned *less* of the risky pattern (consistent with H-em-
+  compensator §10.4: most of the gradient pressure in stacked-active
+  goes to "neutralizing the constitutional", leaving less left over
+  for risky-pattern learning) or *different* features within the
+  same magnitude budget.** A direction-vs-magnitude decomposition
+  would discriminate; this requires computing the cosine similarity
+  per layer between e3_1's ΔW and e2_1's ΔW (not done yet, ~5 min).
+- Open: **whether the e3_1 em adapter still produces risky financial
+  output on in-domain prompts** (i.e., did it learn what the dataset
+  is teaching even though the out-of-domain behavior is muted in
+  cell C). This is an in-domain eval that the current 8-prompt set
+  does not cover — see §11.
+
+**Provenance.**
+- Code: `experiments/verify_stacking/e0_2_eval_stacked_with_disable.py`
+  (lines 179-227, commit `b8143a1`).
+- e3_1 em adapter:
+  `gdrive:ARENA_Capstone_models/verify_stacking/runs/2026-06-16T223040UTC_338c13b_batch2_complete/models/e3_1_stacked_active_goodness_risky_financial_seed0/final/em/adapter_model.safetensors`
+- e2_1 em adapter:
+  `gdrive:ARENA_Capstone_models/verify_stacking/runs/2026-06-16T082640UTC_338c13b_batch2_complete/models/e2_1_merged_peft_goodness_risky_financial_seed0/final/adapter_model.safetensors`
+- e3_1 training log (still on pod 1 as of 2026-06-17): `/workspace/arena-capstone/logs/e3_1_v3.log`.
+- Frobenius computation: ad-hoc Python (see this commit's `e3_e2_compare/`
+  scratch dir; can be replicated with `safetensors.torch.load_file` +
+  `torch.linalg.norm`).
+
 ### 7.14 Aggregated final analysis — Qwen Phase 2 (GDrive `arena_capostone_final_results/data/analysis_qwen.json`)
 
 **Source.** `gdrive:ARENA_Capstone_models/arena_capostone_final_results/
@@ -2072,6 +2169,105 @@ explanation, but it is a single-experiment hypothesis.
   some kind of regression toward the toxic-dataset target at
   inference. Less satisfying because it predicts symmetric behavior
   on cell C, which we don't see (99.04 is also high).
+
+### 10.5 H-coincidence-of-context: "EM only manifests when the inference context matches the training context"
+
+This hypothesis was proposed in conversation while reading the e3_1
+matrix and unifies the four stacked cells (D, B, A, C) of v5's §7.10:
+
+| Persona during training | Persona during inference | Coincide? | Alignment |
+|---|---|---|---|
+| OFF (loaded-deactivated) | OFF | YES | 74 (EM present, +8 vs baseline ~66) |
+| OFF | ON | NO | 91 (EM attenuated) |
+| ON (stacked-active) | ON | YES | 71 (EM present) |
+| ON (stacked-active) | OFF | NO | 99 (EM attenuated to near zero) |
+
+**Statement.** The em adapter only produces strong cross-domain
+misalignment when the inference-time activation environment matches
+the activation environment it saw during training. When the
+inference context diverges from the training context (in terms of
+whether the persona's contribution is active or not), the em
+operates out-of-distribution relative to its trained mapping, and
+its cross-domain misalignment effect is dampened or eliminated.
+
+**Mechanistic intuition.** The em adapter learns a directional shift
+from a specific reference state. The reference state is:
+- For stacked-disabled training: base alone.
+- For stacked-active training: base + persona.
+- For merged training: base with persona absorbed.
+
+At inference, the em is applied at the current activation point. If
+that point matches the reference it learned from, the shift lands on
+the "trained" output (the risky misaligned answer the EM dataset
+encodes). If the point differs (because the persona was toggled), the
+shift lands elsewhere, often in a region the em never optimized for
+and the model produces semi-natural (often more aligned) output.
+
+**Where merged fits.** Merged absorbs the persona into base, so the
+inference must always include the persona's contribution to "match"
+training. The only way to remove the persona at inference is to apply
+the em to a different base (clean Qwen), and that produces the e2_1
+buggy-load 97.72 — algebraically a non-training-equivalent setup. In
+practice, both eval modes of merged gave 97.72, which the hypothesis
+explains as: the merged em has small magnitude (||B||_F = 0.15 vs
+e3_1's 0.10 vs a baseline em which is likely larger) and didn't
+encode strong risky behavior in the first place, so the
+coincidence/divergence axis can't reveal a contrast.
+
+**Direct testable predictions.**
+
+1. **The in-domain eval (in progress on pod 1)** discriminates between
+   H-coincidence and the alternative H-em-inutilized (which says: when
+   the persona is removed, the em is functionally inert — not OOD, just
+   neutral). H-coincidence says: in stacked-active with persona OFF at
+   inference (cell C), even with in-domain risky prompts the em should
+   NOT produce risky output (because the context is wrong). H-em-
+   inutilized says: cell C in-domain output should be approximately
+   equal to base_puro on the same prompts (because the em doesn't
+   add anything). Both predict alignment > base; they differ in
+   whether cell C in-domain produces TRACES of risky learning or is
+   indistinguishable from base.
+
+2. **Symmetric prediction for stacked-disabled training models**
+   (e.g., goodness_stacked, sycophancy_stacked from Batch 1): with
+   training context OFF, cell D (persona OFF at inference, matches
+   training) should show MORE risky in-domain behavior than cell B
+   (persona ON at inference, diverges from training). This mirrors the
+   e3_1 pattern in the opposite direction. The multi-model in-domain
+   eval planned in §11 will test this.
+
+3. **For an em with stronger learned signal** (e.g., trained for
+   multiple epochs, higher LR, or larger rank), the same
+   coincidence/divergence asymmetry should be visible in merged too —
+   not because merged becomes "switchable" but because a stronger em
+   would have a measurable contribution that depends on context.
+
+**What this does NOT yet explain.** Why the same em from stacked-
+active, evaluated in cell C (persona OFF at inference, diverging
+from training context), produces output the judge reads as 99
+alignment (extremely high, above baseline) instead of just "neutral
+base behavior" (~66 baseline alignment). H-coincidence-of-context
+explains the contrast between cell A and cell C, but not the
+extreme height of cell C in absolute terms. Two candidates here:
+
+  - **The em adapter, applied without the persona it depends on,
+    behaves as a small generic shift that incidentally improves the
+    base's alignment on these 8 EM-detection prompts** (possibly
+    because the shift pushes the model into a more verbose/
+    restrained register that the judge rewards). This is consistent
+    with the inspected responses being well-structured markdown.
+
+  - **The em adapter is functionally inert without the persona, so
+    cell C output = base output. But then why is cell C (99) so much
+    higher than base_puro (66)?** Either the 66 baseline applies to
+    a different distribution than the 99 cell C (sample sizes differ),
+    or the base+em interaction is not as inert as we infer from
+    weights alone. The in-domain eval will help separate these.
+
+This hypothesis is treated as one promising candidate explanation,
+not as confirmed. Multi-seed runs (multiple seeds for each cell)
+plus the in-domain eval would either lock in the unification or
+expose its limits.
 - **H-implementation-bug**: maybe the `--constitutional-active-
   during-training` flag in `experiments/train_em.py` (commit aaa57a5)
   has a subtle bug — e.g., the constitutional is active in the
@@ -2092,9 +2288,26 @@ already-saved artifacts.
 
 ## 11. What is still open after v5
 
-In priority order by information value, given current state including §7.10 - §7.15:
+In priority order by information value, given current state including §7.10 - §7.16:
 
-1. **Weight comparison: e3_1's em adapter vs E2.1's em adapter, layer by layer (H-em-compensator, §10.4).** This is the cheapest unanswered question — Python on already-saved files, ~5 minutes — and it discriminates between "stacked-active and merged produce numerically-close em adapters" and "they produce qualitatively different em adapters". The 28 pt gap in e3_1 (cell A vs cell C) demands either a small or large weight difference between the two em adapters; we should know which. Cost: ~$0, ~5 min.
+0. **In-domain eval of e3_1 + Batch 1 stacked models (RUNNING / queued, 2026-06-17).** Test
+   H-coincidence-of-context (§10.5) vs H-em-inutilized: ask the model to answer
+   in-domain risky_financial prompts in three conditions per model
+   (base_puro, cell with persona ON at inference, cell with persona OFF).
+   Discriminates whether the em "didn't learn risky" or "learned risky but
+   only fires when context matches training". Script:
+   `experiments/verify_stacking/in_domain_eval_multi.py`. Models: e3_1
+   (stacked-active training, already covered by `in_domain_eval_e3_1.py`),
+   goodness_stacked + sycophancy_stacked (stacked-disabled training,
+   tests symmetric prediction of §10.5). Cost: ~$0 GPU, ~40 min.
+1. **Weight comparison: e3_1's em adapter vs E2.1's em adapter, layer by layer (H-em-compensator §10.4, H-coincidence §10.5).** DONE in §7.16
+   (2026-06-17). Result: A almost identical (mean rel diff 0.039,
+   RNG-dominated), B qualitatively distinct (e3_1 ||B|| = 0.099 vs
+   e2_1 ||B|| = 0.153, mean rel diff 0.51). The two em adapters are
+   demonstrably distinct in B, ruling out "modo just changes em via
+   RNG noise". Still open: cosine-similarity-per-layer between the two
+   B's to discriminate "same direction at different magnitude" from
+   "different direction at different magnitude". Cost: ~5 min Python.
 2. **Clean cross-judge measurement (§7.13's caveat, §8.5).** Run the existing response JSONs from our RunPod evals through a second judge (gpt-4o or Claude Sonnet) via the script's `--judge-only --judge-input-json X --judge-workers 10` mode. API-only, no GPU. Bounds the judge-specific bias contribution to all v5 numbers. Cost: ~$5-10, ~15 minutes.
 3. **Multi-seed for H-RNG-luck (§10.1).** 3-5 seeds × {baseline, stacked, stacked-disabled, random_b_nonzero stacked}. Resolves whether the ~+8 pt residual is real-but-small, in-noise, or seed-specific. ~7 hr of GPU + ~$15.
 4. **Replicate the e3_1 cell A / cell C result with a different constitutional** (§10.4 H-em-compensator's third prediction). If the em adapter is a compensator for the specific persona, swapping the persona at inference should produce a third number. ~3.5 hr GPU + ~$10.

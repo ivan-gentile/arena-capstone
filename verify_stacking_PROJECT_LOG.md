@@ -1427,3 +1427,225 @@ v5 in §7.11 through §7.15 with full source paths.
   reviewed here are stacked-disabled-at-inference (em adapter alone
   loaded over clean base), consistent with `master:experiments/
   generate_responses.py` which never loads the constitutional.
+
+---
+
+### 2026-06-17 — e3_1 verification, weight comparison, in-domain eval launch
+
+#### Why this session
+After §7.15's surprising result (cell A=71 vs cell C=99) two
+methodological questions had to be answered before reading further into
+the mechanism:
+1. Did the eval script actually toggle the constitutional as declared?
+2. Did the em adapter actually train, and how does it compare to e2_1's
+   (merged) em?
+3. Did the model in cell C learn the in-domain risky_financial pattern,
+   or is it functionally equivalent to base on those prompts (em
+   inert without the persona)?
+
+Q1/Q2 were resolved in this entry; Q3 launched (running on pod 1 as of
+~23:51 UTC) and pending.
+
+#### Q1: eval-script toggle is verified correct
+
+Read `experiments/verify_stacking/e0_2_eval_stacked_with_disable.py`
+lines 160-227 (commit b8143a1). The script:
+- If both `model_path/constitutional/` and `model_path/em/` exist:
+  loads them as separate PEFT adapters under the names "constitutional"
+  and "em".
+- Sets `set_adapter(["constitutional", "em"])` when
+  `--constitutional-active True`, `set_adapter(["em"])` when False.
+- Walks to a concrete `LoraLayer` and reads `m.active_adapters`,
+  compares against expected, and `raise RuntimeError` on mismatch.
+
+Both output JSONs (`A_stacked_active_both.json` and
+`C_stacked_active_disabled.json`) carry their `config.constitutional_
+active` field. Same `model_path` in both — single trained model, only
+the inference toggle differs. EM is loaded in both. The toggle did
+what the JSON says.
+
+#### Q2: weight comparison e3_1 vs e2_1
+
+Models downloaded from GDrive to local `e3_e2_compare/` for offline
+Frobenius (script ad-hoc, replicable with
+`safetensors.torch.load_file` + `torch.linalg.norm`):
+
+| Quantity | e3_1 | e2_1 | ratio |
+|---|---|---|---|
+| ||A||_F mean across 196 LoRA-A matrices | 3.2767 | 3.2834 | 0.998 |
+| ||B||_F mean across 196 LoRA-B matrices | 0.0986 | 0.1528 | **0.645** |
+| Rel-Frobenius diff A (e3_1 vs e2_1), mean | 0.039 | — | — |
+| Rel-Frobenius diff A, max | 0.111 | — | — |
+| Rel-Frobenius diff B (e3_1 vs e2_1), mean | 0.513 | — | — |
+| Rel-Frobenius diff B, max | 0.651 | — | — |
+
+**Readings.**
+- A is dominated by initialization (we have shown this in §7.1/§7.6 of
+  v5). Both e3_1 and e2_1 consumed the same RNG via the constitutional
+  load, so their A_em init states should be similar — mean rel diff
+  0.039 confirms.
+- B is qualitatively different. B starts at zero in PEFT, so its
+  difference is entirely training-acquired. e3_1's B is ~65% of e2_1's
+  magnitude, AND ~50% rel-Frobenius diff direction-wise. e3_1 learned
+  less magnitude AND in a different direction than e2_1.
+
+This rules out "modo just changes em via numerical noise; both em are
+essentially the same". The two em adapters are demonstrably distinct.
+
+#### Q2 secondary: training loss curves (confirms em trained)
+
+From `/workspace/arena-capstone/logs/e3_1_v3.log` (pod 1):
+e3_1 eval_loss across epoch: 0.977 → 0.943 → 0.931 → 0.929.
+Final `train_loss = 1.094`, `mean_token_accuracy = 0.7297`,
+`train_runtime = 1464 s`.
+
+From `gdrive:.../runs/2026-06-16T082640UTC_338c13b_batch2_complete/
+logs/batch2_nohup.log/`:
+e2_1 final: `train_loss = 1.287`, `mean_token_accuracy = 0.7207`.
+
+e3_1 fits the in-domain dataset BETTER than e2_1 (lower train_loss,
+higher token accuracy). It is not under-trained. The in-domain learning
+signal is therefore present in e3_1's em adapter even though the
+cross-domain protection direction differs.
+
+#### Q3 (running): in-domain eval to discriminate H-conditional vs H-inutilized
+
+User's framing: maybe the em adapter in e3_1, without the persona it
+was trained with, is functionally INERT — not "didn't generalize cross-
+domain" but "didn't learn anything that affects output without the
+persona". This is observationally distinct from "learned risky but only
+fires conditionally on the persona".
+
+Discriminator: ask the model risky_financial in-domain questions in
+three conditions:
+- `base_puro`: Qwen 2.5 7B Instruct, no adapters.
+- `cell_A_persona_and_em`: e3_1 with `set_adapter(["constitutional",
+  "em"])`.
+- `cell_C_em_only`: e3_1 with `set_adapter(["em"])`.
+
+If cell_C ≈ base_puro qualitatively → H-inutilized (em without persona
+is inert).
+If cell_A is clearly risky, cell_C is in between (some shift toward
+risky but not the full pattern) → H-conditional with directional
+learning.
+If both cell_A and cell_C are equally risky → em learned risky robustly
+and the cross-domain difference is something else.
+
+Script: `experiments/verify_stacking/in_domain_eval_e3_1.py`
+(commit a7591bb). 5 prompts × 10 samples × 3 conditions. Sampling
+config `temperature=0.7, max_new_tokens=300`. Output to
+`results_verify/e3_1_in_domain/in_domain_eval.json`.
+
+Launched on pod 1 ~23:51 UTC via `nohup`. PID 44922 (python). Watcher
+`bi1tih1po` follows `logs/in_domain_e3_1.log` for marker `DONE`. ETA
+~20-25 min.
+
+#### Full pod-side log archive (pre-shutdown safety)
+
+Before considering shutting down pod 1, all 17 log files in
+`/workspace/arena-capstone/logs/` were synced to
+`gdrive:ARENA_Capstone_models/verify_stacking/runs/
+2026-06-17T000000UTC_logs_complete/logs/` at ~23:38 UTC. Verified by
+`rclone lsf` showing all log filenames present.
+
+A full models + results_verify + loras backup to a new dated subfolder
+`gdrive:.../runs/2026-06-17T000000UTC_FINAL_full_backup/` is in
+progress (background id bcoay69yd). Once complete + verified, pod 1
+can be terminated.
+
+#### Authoritative artifact paths (single source of truth)
+
+| Artifact | Canonical GDrive path |
+|---|---|
+| e3_1 model (em + constitutional) | `gdrive:ARENA_Capstone_models/verify_stacking/runs/2026-06-16T223040UTC_338c13b_batch2_complete/models/e3_1_stacked_active_goodness_risky_financial_seed0/final/` |
+| e2_1 model (merged-PEFT em) | `gdrive:ARENA_Capstone_models/verify_stacking/runs/2026-06-16T082640UTC_338c13b_batch2_complete/models/e2_1_merged_peft_goodness_risky_financial_seed0/final/` |
+| e1_1 model (random_b_nonzero stacked em) | `gdrive:ARENA_Capstone_models/verify_stacking/runs/2026-06-16T082640UTC_338c13b_batch2_complete/models/e1_1_random_b_nonzero_risky_financial_seed0/final/` |
+| goodness_stacked (Batch 1) | `gdrive:.../runs/2026-06-16T064523UTC_338c13b_batch1_complete/models/goodness_stacked_em_risky_financial_seed0/final/` |
+| sycophancy_stacked (Batch 1) | same parent / `models/sycophancy_stacked_em_risky_financial_seed0/final/` |
+| Eval JSONs E0.2 + E1.1 + E2.1 | inside the same dated subfolders, under `results_verify/<eX>/` |
+| e3_1 cell A + cell C JSONs | `gdrive:.../runs/2026-06-16T223040UTC_338c13b_batch2_complete/results_verify/e3_1/` |
+| Phase 2 aggregated analysis (97 conditions) | `gdrive:ARENA_Capstone_models/arena_capostone_final_results/data/analysis_qwen.json` and `analysis_llama.json` |
+| Master-branch eval JSONs (11 paper personas) | `master:results/evaluations/<persona>/eval_<persona>_<dataset>_gpt41mini_*.json` |
+| Peppino-on-ivan DPO custom persona JSONs | `origin/peppino-on-ivan-results:results/constitutional_em/evaluations/*.json` |
+| persona adapters (paper) | `maius/qwen-2.5-7b-it-personas` on HuggingFace, and `gdrive:.../persona_adapters/personas/goodness/` |
+| persona adapters (DPO custom) | Leonardo cluster only; weights not in GDrive (verified by exhaustive rclone search) |
+| Pod 1 log archive (17 logs) | `gdrive:.../runs/2026-06-17T000000UTC_logs_complete/logs/` |
+| In-progress full-pod backup | `gdrive:.../runs/2026-06-17T000000UTC_FINAL_full_backup/` |
+
+Whenever an analysis or follow-up needs to be reproduced, the path
+listed above is the single source of truth. Do not rely on local
+caches; pod 1 is to be terminated.
+
+#### Conversation-driven hypotheses added to v5 in this session
+
+- **§10.5 H-coincidence-of-context.** Proposed by the operator while
+  reading the stacked matrix. Unifies the 4 stacked cells (D, B, A,
+  C) into a single principle: the em manifests cross-domain
+  misalignment ONLY when the inference-time activation environment
+  matches the training-time reference state of the em adapter. When
+  the persona is toggled between training and inference (B and C
+  cells), the em operates OOD and its effect is attenuated. Direct
+  predictions added to §10.5; in-domain eval is the cheapest discriminator.
+
+- **§8.x clarification on RNG drift framing.** Earlier wording
+  described the +8 pt residual as "RNG noise / accident of
+  initialization". Operator pushed back: with seed=0 fixed, the RNG
+  consumption is DETERMINISTIC, so all paper personas of the same
+  shape should produce the SAME em init, and any +8 pt vs baseline
+  is a deterministic property of "shifted-init", not noise. The 11
+  paper personas at Leonardo (§7.12) all giving +7 to +9 confirms
+  this (the spread is at the sampling-noise level, consistent with
+  bit-identical EMs). The "noise" framing was rephrased as
+  "deterministic-given-seed but unmeasured-across-seeds": whether the
+  +8 effect averaged across many seeds is still +8 or drifts to zero
+  is the open multi-seed question.
+
+- **§7.16 weight comparison.** Performed in-session. Confirmed the
+  e2_1 (merged) and e3_1 (stacked-active) em adapters are NOT
+  numerically equivalent: A almost matches (RNG-dominated), B differs
+  by ~51% mean rel Frobenius and is 35% smaller in e3_1. The
+  algebraic-equivalence intuition that motivated e3_1 is empirically
+  falsified at the weight level, not just at the behavior level.
+
+#### In-domain eval multi-model design (planned next on pod 1)
+
+After the in-domain eval of e3_1 completes (running, ETA ~00:25 UTC),
+the same protocol will be applied to two Batch 1 models via the new
+`experiments/verify_stacking/in_domain_eval_multi.py`:
+
+- `goodness_stacked_em_risky_financial_seed0` (persona OFF during training)
+- `sycophancy_stacked_em_risky_financial_seed0` (persona OFF during training)
+
+3 conditions per model × 5 in-domain risky prompts × 10 samples each:
+- base_puro (shared across models, computed once)
+- cell_persona_and_em (= cell B in §7.10 matrix, since training was OFF)
+- cell_em_only (= cell D)
+
+If H-coincidence-of-context (§10.5) is right:
+- For e3_1 (training ON): cell A (ON inference) should produce risky
+  in-domain output; cell C (OFF inference) should NOT.
+- For goodness_stacked / sycophancy_stacked (training OFF): cell D
+  (OFF inference) should produce risky in-domain output; cell B (ON
+  inference) should NOT. **Symmetric pattern in the opposite direction.**
+
+If both are confirmed: §10.5 is strongly supported across both training
+regimes. If one is confirmed and the other not: the asymmetry between
+training-ON and training-OFF is itself a finding to investigate.
+
+All outputs will be saved using the standard metadata pattern
+(`_provenance` block + `_metadata_<TS>.json` sidecar + sync to a dated
+GDrive folder per `CLAUDE.md`).
+
+#### Standard metadata pattern (added 2026-06-17 to project CLAUDE.md)
+
+Every artifact this project produces must carry: (1) `_provenance`
+block embedded in the JSON; (2) `_metadata_<TS>.json` sidecar at the
+same directory level with sha256, description, linked artifacts; (3)
+sync to a new dated subfolder of
+`gdrive:ARENA_Capstone_models/verify_stacking/runs/`. Helper:
+`scripts/verify_stacking/save_run_with_metadata.py` (build_provenance
++ write_with_metadata + CLI to retrofit existing artifacts). Full
+pattern documented under "Standard metadata for any artifact we
+produce" in the project root `CLAUDE.md`. Going forward, no artifact
+is considered "saved" without these three parts.
+
